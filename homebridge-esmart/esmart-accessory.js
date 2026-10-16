@@ -118,7 +118,7 @@ function buildAccessory(node, ctrl, hap, log, existingAcc) {
       const curM = svc.getCharacteristic(C.CurrentHeatingCoolingState);
       const tgtM = svc.getCharacteristic(C.TargetHeatingCoolingState);
       const units = svc.getCharacteristic(C.TemperatureDisplayUnits);
-      units.updateValue(C.TemperatureDisplayUnits.CELSIUSipse);
+      units.updateValue(C.TemperatureDisplayUnits.CELSIUS);
       const modeToHK = (m) =>
         m === "heat" ? C.TargetHeatingCoolingState.HEAT :
         m === "cool" ? C.TargetHeatingCoolingState.COOL :

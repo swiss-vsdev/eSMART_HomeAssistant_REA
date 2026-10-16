@@ -16,6 +16,12 @@
     "node": ">=16",
     "homebridge": ">=1.6.0"
   },
+  "scripts": {
+    "test": "node test/esmart-map.test.js"
+  },
   "dependencies": {},
+  "optionalDependencies": {
+    "hap-nodejs": "^0.14.3"
+  },
   "devDependencies": {}
 }

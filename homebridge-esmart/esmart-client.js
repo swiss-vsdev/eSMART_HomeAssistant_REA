@@ -93,28 +93,6 @@ class BridgeClient {
   }
   pulseAlarm(id) { return this.request(`/api/alarm/${id}/pulse`, { method: 'POST' }); }
   runScene(num) { return this.request(`/api/scene/${num}`, { method: 'POST' }); }
-
-  /**
-   * Poll the bridge until it reports the node's state actually changed.
-   * The bridge only learns state from the XMPP stream, so this just gives the
-   * master time to answer; failure to converge is reported, never fatal.
-   */
-  async waitForState(id, predicate, { timeoutMs = 8000, intervalMs = 500 } = {}) {
-    const deadline = Date.now() + timeoutMs;
-    let last = null;
-    while (Date.now() < deadline) {
-      try {
-        const all = await this.nodes();
-        const n = Array.isArray(all) ? all.find((x) => Number(x.id) === Number(id)) : null;
-        last = n ? n.state : null;
-        if (last && predicate(last)) return last;
-      } catch (e) {
-        /* keep polling; the bridge may be mid-reconnect */
-      }
-      await new Promise((r) => setTimeout(r, intervalMs));
-    }
-    return last;
-  }
 }
 
 module.exports = { BridgeClient };

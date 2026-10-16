@@ -106,6 +106,10 @@ Each node maps to a HomeKit service:
 node esmart-homekit.js --bridge-url http://127.0.0.1:8090 --pin 12345678
 ```
 
+Standalone mode needs `hap-nodejs`: run `npm install` once inside this folder
+(it is declared as an optional dependency; the Homebridge plugin path gets
+hap from Homebridge itself and needs nothing extra).
+
 Pair with the Home app using the PIN. `--port`, `--name`, `--poll`,
 `--blinds-invert`, and `--storage` are optional.
 

@@ -10,14 +10,24 @@
  *   node esmart-homekit.js --port 8090 --pin 12345678
  *
  * Pair with the Home app on an iPhone: scan the QR code on the console.
- * Zero npm dependencies beyond hap-nodejs (which you already have installed).
+ * Standalone mode needs hap-nodejs (declared as an optional dependency of
+ * this package): run `npm install` once inside this folder before starting.
  */
 "use strict";
 
 const { BridgeClient } = require("./esmart-client");
 const { buildAccessory } = require("./esmart-accessory");
 const { displayName } = require("./esmart-map");
-const hap = require("hap-nodejs");
+let hap;
+try {
+  hap = require("hap-nodejs");
+} catch {
+  console.error(
+    "\n[eSMART] hap-nodejs is required for the standalone bridge.\n" +
+    "         Run `npm install` inside this folder, then start again.\n",
+  );
+  process.exit(1);
+}
 
 const HAP = hap;
 const { Bridge, Accessory, Service, Characteristic, Categories } = HAP;
