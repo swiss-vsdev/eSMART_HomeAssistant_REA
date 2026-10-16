@@ -1,5 +1,23 @@
 #!/usr/bin/env python3
 """
+LEGACY, SUPERSEDED -- kept for reference only.
+
+This was the first reverse-engineering pass at the eSMART wire format. Its
+wire guesses were later corrected by the verified implementation; do NOT copy
+wire details from here (see esmart_core.py and REPORT.md):
+
+  - Envelope : no <com:esa>/<json> XML elements; the raw JSON string goes
+               inside a <body> child of the groupchat message
+  - Switches : "onoff" is "on"/"off", not "1"/"0"
+  - Room     : the house MUC room is "shared" (or the account's stored
+               room), not derived from the JID user part
+  - Version  : headers carry "1.12.0"; "1.4.0" is only the fixtures fallback
+
+Current entry points: esmart-bridge.py (maintained XMPP client),
+esmart-pair.py, homebridge-esmart/.
+
+--- original notes below, kept for history and known wrong where noted ---
+
 eSMART-live XMPP sender (reverse-engineered wire format).
 
 Wire recap (from static analysis of the arm64 eSMART-live binary v2.12.0):
