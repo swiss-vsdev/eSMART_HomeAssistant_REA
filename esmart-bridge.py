@@ -456,6 +456,7 @@ def main():
     print(" HTTP API  : http://%s:%d" % (args.host, args.port))
     print(" Web UI    : http://%s:%d/" % (args.host, args.port))
     print(" Web Pair  : http://%s:%d/pair" % (args.host, args.port))
+    print("             (first run: enter the 16 digits from your tablet there)")
     print(" Mode      : %s" % ("DRY-RUN (no network traffic)" if args.dry else "LIVE"))
     print(" JID       : %s" % (BRIDGE.jid or "(none -- run ./esmart-pair.py or visit /pair)"))
     print(" Room      : %s" % BRIDGE.room)

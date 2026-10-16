@@ -1,5 +1,9 @@
 # homebridge-esmart
 
+> New here? See the top-level [README.md](../README.md) for the one-click
+> setup ("Start eSMART"), pairing and troubleshooting. This file is the
+> detailed reference for the Homebridge plugin and the standalone bridge.
+
 Expose eSMART (myeSMART) home devices to Apple HomeKit.
 
 This is a **Homebridge plugin** that talks to the local `esmart-bridge.py` HTTP

@@ -178,6 +178,9 @@ def main():
 
     save_env(args.out, jid_full, password, "shared", code)
     ok = probe(jid_full, password, "shared", args, code=code)
+    if ok:
+        print("\nAll good.  Start the bridge with:")
+        print("   python3 esmart.py        (or double-click 'Start eSMART')")
     if not ok:
         print("\nPairing was accepted by the cloud but the XMPP login did not")
         print("complete.  Two likely causes:")

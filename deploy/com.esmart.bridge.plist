@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- eSMART bridge as a macOS service (optional).
+     The double-click Start/Stop wrappers are usually enough; install this
+     only if you want the bridge to survive reboots as a server.
+
+     1. Edit the two /opt/esmart paths below to where this project lives.
+     2. cp deploy/com.esmart.bridge.plist ~/Library/LaunchAgents/
+     3. launchctl load ~/Library/LaunchAgents/com.esmart.bridge.plist
+     4. Logs: /tmp/esmart-bridge.log
+     To remove: launchctl unload ~/Library/LaunchAgents/com.esmart.bridge.plist -->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.esmart.bridge</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/python3</string>
+    <string>/opt/esmart/esmart.py</string>
+    <string>run</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/opt/esmart</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/tmp/esmart-bridge.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/esmart-bridge.log</string>
+</dict>
+</plist>

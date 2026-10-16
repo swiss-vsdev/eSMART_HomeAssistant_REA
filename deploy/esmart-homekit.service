@@ -1,0 +1,27 @@
+# eSMART HomeKit bridge (hap-nodejs) as a Linux / Raspberry Pi service.
+# Start the bridge service first: this one talks to it over localhost.
+#
+# 1. Install Node.js and hap-nodejs once:
+#      sudo apt install -y nodejs npm   (or use nodesource for a recent Node)
+#      cd /opt/esmart/homebridge-esmart && npm install
+# 2. Check `which node` and fix ExecStart below if it is not /usr/bin/node.
+# 3. sudo cp deploy/esmart-homekit.service /etc/systemd/system/
+# 4. sudo systemctl daemon-reload
+# 5. sudo systemctl enable --now esmart-homekit
+# 6. Live logs:  journalctl -u esmart-homekit -f
+#    (The Home app setup code / PIN is printed there: "PIN 12345678".)
+
+[Unit]
+Description=eSMART HomeKit bridge (Apple Home)
+After=network-online.target esmart-bridge.service
+Wants=esmart-bridge.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/esmart/homebridge-esmart
+ExecStart=/usr/bin/node esmart-homekit.js
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

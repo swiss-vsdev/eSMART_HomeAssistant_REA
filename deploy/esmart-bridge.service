@@ -1,0 +1,22 @@
+# eSMART bridge as a Linux / Raspberry Pi service (systemd).
+#
+# 1. Edit the paths below to where this project lives (example: /opt/esmart).
+# 2. sudo cp deploy/esmart-bridge.service /etc/systemd/system/
+# 3. sudo systemctl daemon-reload
+# 4. sudo systemctl enable --now esmart-bridge
+# 5. Live logs:  journalctl -u esmart-bridge -f
+
+[Unit]
+Description=eSMART local bridge (HTTP + XMPP)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/esmart
+ExecStart=/usr/bin/python3 /opt/esmart/esmart.py run
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

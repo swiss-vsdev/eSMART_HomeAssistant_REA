@@ -42,7 +42,7 @@ const arg = (name, def) => {
 };
 const PORT = Number(arg("--port", "8090"));
 const BRIDGE_NAME = arg("--name", "eSMART Bridge");
-const PIN = arg("--pin", "12345678");
+const PIN = arg("--pin", process.env.ESMART_HOMEKIT_PIN || "12345678");
 const BRIDGE_URL = arg("--bridge-url", "http://127.0.0.1:8090");
 const POLL_MS = Math.max(1000, Number(arg("--poll", "30000")));
 const BLINDS_INVERT = /1|true|yes/i.test(arg("--blinds-invert", "false"));
