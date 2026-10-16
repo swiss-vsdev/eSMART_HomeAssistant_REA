@@ -1,0 +1,4 @@
+#!/bin/sh
+# esmart-xmpp <jid> <password> <room> '<json body>'   [--dry]
+# Minimal eSMART (XMPP MUC) command sender. Requires python3 (stdlib only).
+exec python3 "$(dirname "$0")/esmart-xmpp.py" "$@"

@@ -1,0 +1,53 @@
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>eSMART – HTTP→XMPP lamp bridge</title>
+<style>
+ body{font-family:-apple-system,system-ui,sans-serif;background:#f7f8fa;margin:0;padding:24px;color:#1d1d1d}
+ h1{font-size:1.3em;margin-top:0}
+ label{font-weight:600;font-size:.9em}
+ select,button,option,input{margin:.4em 0;font-size:1em;padding:.5em 1em;border:1px solid #bbb;border-radius:6px}
+ button{background:#007aff;color:#fff;border:none;cursor:pointer;width:100%;margin-top:1em;padding:12px;font-weight:600}
+ button:disabled{background:#999;cursor:default}
+ .row{border:1px solid #e0e0e0;border-radius:10px;padding:14px 16px;margin-bottom:14px;background:#fff}
+ .id{width:8ch} .tag{color:#666;font-size:.8em}
+ .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
+</style>
+</head>
+<body>
+<h1>eSMART → lampes</h1>
+<div class="row">
+  <div class="tag">Backend HTTP</div>
+  <select id="host"><option value="http://127.0.0.1:8090">http://127.0.0.1:8090</option></select>
+</div>
+<div class="row">
+  <div class="tag">ID node (ex. 36)</div><input id="nid" class="id" type="number" min="1" value="36">
+</div>
+<div class="row">
+  <div class="tag">État</div>
+  <div class="grid">
+    <button id="on" onclick="set('on')">ON</button>
+    <button id="off" onclick="set('off')">OFF</button>
+  </div>
+</div>
+<pre id="out" style="background:#202024;color:#eee;padding:12px;border-radius:8px;font-size:.8em;min-height:60px;overflow:auto"></pre>
+<script>
+const out=document.getElementById('out');
+function log(s){ out.textContent += s+'\n'; out.scrollTop=out.scrollHeight; }
+async function set(onoff){
+  const btn=document.getElementById(onoff);
+  const host=document.getElementById('host').value;
+  const id=document.getElementById('nid').value;
+  btn.disabled=true; btn.textContent='…envoi…';
+  try{
+    const r=await fetch(host+'/api/node/'+id+'/'+onoff, {method:'POST'});
+    const txt=await r.text();
+    log('['+new Date().toLocaleString()+'] '+id+' -> '+onoff+'  HTTP '+r.status);
+    if(txt) log(txt);
+  }catch(e){ log('ERR '+e); }
+  btn.textContent=onoff==='on'?'ON':'OFF'; btn.disabled=false;
+}
+</script>
+</body>
+</html>

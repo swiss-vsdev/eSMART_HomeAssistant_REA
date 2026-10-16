@@ -1,0 +1,21 @@
+{
+  "name": "homebridge-esmart",
+  "version": "1.0.0",
+  "description": "HomeKit support for eSMART (myeSMART) homes, via the local esmart-bridge.py daemon that speaks the app's own XMPP protocol.",
+  "license": "MIT",
+  "main": "index.js",
+  "keywords": [
+    "homebridge-plugin",
+    "homebridge",
+    "homekit",
+    "esmart",
+    "myesmart",
+    "xmpp"
+  ],
+  "engines": {
+    "node": ">=16",
+    "homebridge": ">=1.6.0"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}
