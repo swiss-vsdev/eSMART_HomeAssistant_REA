@@ -9,7 +9,7 @@ REPORT.md.
 Nothing here is guessed where it could be read:
   * the pairing hash is *live-verified* against the real server (E-P2)
   * the credential format is read from XMPPAccountManager (E-A1..E-A4)
-  * the wire format is read from MessageProtocol + XMPPFramework (E-W1..E-W5)
+  * the wire format is read from MessageProtocol + XMPPFramework (E-W1..E-W3, E-W6)
 
 No third-party packages are required (Python 3.8+ stdlib only).
 """
