@@ -470,8 +470,30 @@ class EsmartXMPP:
                 break
             if self.verbose:
                 _log("<<", data[:400].decode("utf-8", "replace"))
-            self._parser.feed(data.decode("utf-8", "replace"))
-            out += [el for _, el in self._parser.read_events() if el.tag != "stream:stream"]
+            # Every <stream:stream> restart (after STARTTLS, after SASL) re-opens
+            # with a fresh "<?xml …?>" declaration.  ElementTree refuses a
+            # declaration that is not at the start of the entity, which killed the
+            # connection right after authentication.  Drop them all: payload text
+            # goes through xml_escape(), so a literal declaration can never be
+            # message data.
+            text = re.sub(r"<\?xml[^>]*\?>", "", data.decode("utf-8", "replace"))
+            try:
+                self._parser.feed(text)
+                got = [el for _, el in self._parser.read_events()
+                       if el.tag != "stream:stream"]
+            except ET.ParseError as e:
+                # Last resort: never crash the reader on one bad chunk.
+                _log("warning: dropping unparsable chunk:", e)
+                self._new_parser()
+                continue
+            out += got
+            # Return as soon as anything is available. Draining to the deadline
+            # here made every _await() cost its full timeout even on an instant
+            # reply: registration took ~42s and a connect ~60s, which blows the
+            # tablet's one-minute pairing window. Callers that want to keep
+            # reading (read_stanzas/read_esmart) loop over us anyway.
+            if out:
+                return out
         return out
 
     def _next_id(self):
@@ -564,6 +586,77 @@ class EsmartXMPP:
         _log("registration accepted for", username)
         return "ok"
 
+    def register_new_account(self, username: str, password: str) -> str:
+        """Create the account like -[AppDelegate createAccount] (E-R1/E-R2b).
+
+        TCP -> STARTTLS -> stream restart -> <register> IQ, *without* SASL.
+        The server advertises <register xmlns='…/features/iq-register'/> on the
+        pre-auth stream after TLS and its form asks for username+password only,
+        so this is the only way a fresh four-digit pairing gets an account: the
+        16-digit flow instead has the cloud pre-create it during the HTTP POST.
+        """
+        raw = socket.create_connection((self.host, self.port), self.timeout)
+        raw.settimeout(2.0)
+        self.sock = raw
+        self._eof = False
+        self._new_parser()
+        self._open_stream()
+        if self._await(("features",), 10) is None:
+            raise EsmartError("no <stream:features> from server")
+        self._send("<starttls xmlns='urn:ietf:params:xml:ns:xmpp-tls'/>")
+        resp = self._await(("proceed", "failure"), 10)
+        if resp is None or _find(resp, "failure") is not None:
+            raise EsmartError("STARTTLS refused: %s" % _dump(resp))
+        self.sock = make_ssl_context(self.insecure).wrap_socket(
+            raw, server_hostname=self.host)
+        self.sock.settimeout(2.0)
+        self._new_parser()
+        self._open_stream()
+        feats = self._await(("features",), 10)
+        if feats is None:
+            raise EsmartError("no features after TLS")
+        if _find(feats, "register") is None:
+            raise EsmartError("server does not advertise in-band registration")
+        return self.register(username, password)
+
+    # -- roster / subscription -------------------------------------------
+    def accept_subscription(self, jid: str) -> str:
+        """-[XMPPStream acceptSubscription:] (E-M5): <presence type="subscribed"/>."""
+        bare = jid.split("/")[0]
+        self._send('<presence to="%s" type="subscribed"/>' % bare)
+        return bare
+
+    def wait_for_subscription(self, seconds: float = 45.0, accept: bool = True):
+        """Wait for the installation to subscribe to us; return its room name.
+
+        -[AppDelegate xmppStream:didReceivePresence:] (E-M5) is what actually
+        finishes pairing.  On <presence type="subscribe"> it accepts the
+        subscription, builds the house room with
+            [NSString stringWithFormat:@"%@\\x40conference.%@", <local part>, @"myesmart.net"]
+        from the *subscriber's* bare JID, joins it 0.5 s later, and only then
+        posts kHidePairingView/kShowDevicesList.  Nothing is ever announced in
+        the shared room, so waiting for a room reply can never succeed: the
+        pairing signal is this stanza.
+        """
+        with self._rlock:
+            end = time.time() + seconds
+            while time.time() < end:
+                for el in self._pump(end):
+                    if _localname(el) != "presence" or el.get("type") != "subscribe":
+                        self.inbox.append(el)
+                        continue
+                    frm = el.get("from") or ""
+                    bare = frm.split("/")[0]
+                    local = bare.split("@")[0]
+                    if not local:
+                        continue
+                    if accept:
+                        self.accept_subscription(bare)
+                    _log("paired: %s subscribed to us -> room %s"
+                         % (bare, room_jid(local, self.domain)))
+                    return local
+        return None
+
     # -- presence / rooms -------------------------------------------------
     def go_online(self, room_name=None, *, join_shared=True):
         """Mirror -[AppDelegate goOnline] (E-M3): send bare presence, then join
@@ -604,15 +697,41 @@ class EsmartXMPP:
         text = build_envelope(body, msg_from=self.bare, to=to,
                               method=method, mtype=mtype, version=version)
         target = self.room or room_jid(self.room_name or "shared", self.domain)
-        self._send('<message to="%s/%s" type="groupchat"><body>%s</body></message>'
-                   % (target, self.user, xml_escape(text)))
+        self._send('<message to="%s" type="groupchat"><body>%s</body></message>'
+                   % (target, xml_escape(text)))
+        return text
+
+    def send_pair_code(self, code: int, name: str, room: str = "shared"):
+        """Four-digit pairing, as an eSMART-Touch does it (E-P3).
+
+        -[AppDelegate sendCode:] @0x10000db20 JSON-serializes
+            {code: @(int), jid: jidWithHost, name: DeviceKitInfo.safeDescription}
+        and hands that string to -[XMPPRoom sendMessageWithBody:] on the room
+        joined by -[AppDelegate joinSharedRoom] @0x10000d8f4, i.e.
+        `shared@conference.myesmart.net`.  The body is the bare JSON object, NOT
+        the MessageProtocol envelope.  The code is sent as a NUMBER, so "0034"
+        reaches the hub as 34.
+        """
+        text = json.dumps({"code": int(code), "jid": self.bare, "name": name},
+                          separators=(",", ":"), ensure_ascii=False)
+        target = room_jid(room, self.domain)
+        self._send('<message to="%s" type="groupchat"><body>%s</body></message>'
+                   % (target, xml_escape(text)))
         return text
 
     def read_esmart(self, seconds: float = 8.0, on_element=None):
-        """Collect decoded eSMART envelopes seen on the room for `seconds`."""
+        """Collect decoded eSMART envelopes seen on the room for `seconds`.
+
+        Our own messages are skipped: a MUC echoes every groupchat message back
+        to the sender, so our own GET would otherwise look like the master's
+        answer.
+        """
         found = []
+        mine = "/" + self.user
         for el in self.read_stanzas(seconds, on_element=on_element):
             if el.tag.split("}")[-1] != "message":
+                continue
+            if (el.get("from") or "").endswith(mine):
                 continue
             b = el.find("{jabber:client}body")
             txt = (b.text or "").strip() if b is not None else ""
@@ -630,6 +749,12 @@ class EsmartXMPP:
             end = time.time() + seconds
             while time.time() < end:
                 for el in self._pump(end):
+                    # Never miss a pairing signal, whichever reader is running
+                    # (E-M5): accepting a subscription is idempotent.
+                    if (_localname(el) == "presence"
+                            and el.get("type") == "subscribe"
+                            and el.get("from")):
+                        self.accept_subscription(el.get("from"))
                     out.append(el)
                     if on_element:
                         on_element(el)

@@ -1,22 +1,29 @@
 #!/usr/bin/env python3
 """
-esmart-pair.py -- turn the 16 digits on your eSMART tablet into working credentials.
+esmart-pair.py -- turn the pairing code on your eSMART tablet into credentials.
 
-You do NOT need to know your JID.  The app never asks you for one either: it
-generates one locally, hashes it together with the pairing code, and registers
-the resulting XMPP account with the cloud.  This tool replays that exact
-sequence (see REPORT.md, evidence E-P1/E-P2/E-A1..E-A4/E-R1/E-R2).
+Two pairing flows exist in the app, picked by the length of the code:
+
+  * 4 digits  -- the eSMART-Touch "Add a remote" screen.  No HTTP: the account
+    is registered in-band, the phone joins shared@conference.myesmart.net and
+    announces {"code": N, "jid": ..., "name": ...} on that room (E-P3).
+  * 16 digits -- newer screens.  POST {jid, hash, code} to
+    https://live.myesmart.net/16digits_pairing.php (E-P1/E-P2).
+
+Either way you do NOT need to know your JID.  The app never asks you for one
+either: it generates one locally, and the resulting XMPP account is registered
+with the cloud.  This tool replays that exact sequence (see REPORT.md).
 
     1. generate a JID + password byte-for-byte like XMPPAccountManager
-    2. POST {jid, hash, code} -> https://live.myesmart.net/16digits_pairing.php
-       where hash = sha256(jid + "2AWnuKDbaFsNfC9e")        <-- E-P1, live-verified
+    2. pair: cloud POST (16 digits) or the shared-room code message (4 digits)
     3. XMPP in-band registration of that JID (like -[AppDelegate createAccount])
     4. verify we can SASL-authenticate and see the house room
     5. write .esmart.env
 
 USAGE
-    ./esmart-pair.py 1234567890123456          # do it
-    ./esmart-pair.py 1234567890123456 --dry    # show every request, send nothing
+    ./esmart-pair.py 1234                      # eSMART-Touch, 4 digits
+    ./esmart-pair.py 1234567890123456          # 16-digit screens
+    ./esmart-pair.py 1234 --dry                # show every request, send nothing
     ./esmart-pair.py --rejoin                  # re-verify already-saved credentials
 """
 
@@ -26,6 +33,7 @@ import argparse
 import getpass
 import json
 import os
+import socket
 import ssl
 import sys
 import urllib.error
@@ -58,10 +66,11 @@ def read_code(args) -> str:
     elif not sys.stdin.isatty():
         raw = sys.stdin.read()
     else:
-        raw = getpass.getpass("16-digit code shown on your tablet (input hidden): ")
+        raw = getpass.getpass("pairing code shown on your tablet (4 or 16 digits, input hidden): ")
     digits = "".join(ch for ch in raw if ch.isdigit())
-    if len(digits) != 16:
-        sys.exit("expected exactly 16 digits, got %d (%r)" % (len(digits), digits))
+    if len(digits) not in (4, 16):
+        sys.exit("expected 4 digits (eSMART-Touch) or 16 digits (newer eSMART), "
+                 "got %d (%r)" % (len(digits), digits))
     return digits
 
 
@@ -109,9 +118,127 @@ def save_env(path, jid_full, password, room_name, code):
     log("wrote", path, "(mode 600)")
 
 
+def announce_four_digit_code(jid_full: str, password: str, code: str, *,
+                             verbose: bool = False, insecure: bool = False,
+                             name: str | None = None, wait: float = 45.0):
+    """Register the account, announce the 4-digit code, wait for the pairing.
+
+    Shared by the terminal wizard and the bridge's /pair page.  Returns
+    ``(body, room)``: the JSON body posted on the shared room and the house room
+    the installation announced by subscribing to us (E-M5), or ``None`` if it
+    never subscribed.  Raises EsmartError if the XMPP session cannot be set up.
+    """
+    local = jid_full.split("@")[0]
+    try:
+        reg = EsmartXMPP(jid_full, password, host=XMPPHOST, port=XMPPPORT,
+                         verbose=verbose, insecure=insecure)
+        reg.register_new_account(local, password)
+        reg.close()
+    except EsmartError as e:
+        log("registration step:", e)
+        log("(continuing -- the account may already exist from a previous run)")
+
+    cli = EsmartXMPP(jid_full, password, host=XMPPHOST, port=XMPPPORT,
+                     verbose=verbose, insecure=insecure)
+    cli.connect()
+    cli._send("<presence/>")
+    cli._await(("presence", "iq", "message"), 6)
+    cli.join_room("shared")
+    body = cli.send_pair_code(
+        int(code),
+        name or os.environ.get("ESMART_REMOTE_NAME") or socket.gethostname())
+    log("sent on shared@conference.%s: %s" % (DOMAIN, body))
+    log("waiting up to %ds for the installation to subscribe to us ..." % wait)
+    room = cli.wait_for_subscription(wait) if wait else None
+    cli.close()
+    return body, room
+
+
+def discover_paired_room(jid_full: str, password: str, *, seconds: float = 45.0,
+                         verbose: bool = False, insecure: bool = False):
+    """Connect and wait for the installation to subscribe to us (E-M5).
+
+    Both pairing flows end the same way: the installation sends
+    <presence type="subscribe"> and the house room is the local part of its bare
+    JID.  Returns the room name, or None if nobody subscribed.
+    """
+    cli = EsmartXMPP(jid_full, password, host=XMPPHOST, port=XMPPPORT,
+                     verbose=verbose, insecure=insecure)
+    try:
+        cli.connect()
+    except EsmartError as e:
+        log("AUTH FAILED:", e)
+        return None
+    cli._send("<presence/>")
+    cli._await(("presence", "iq", "message"), 6)
+    room = cli.wait_for_subscription(seconds)
+    cli.close()
+    return room
+
+
+def pair_four_digit(code: str, args) -> bool:
+    """eSMART-Touch pairing (E-P3) -- no HTTP call at all.
+
+    The wall screen shows a sequence of FOUR numbers.  The app registers its
+    own XMPP account, joins the shared room and hands the code to
+    -[XMPPRoom sendMessageWithBody:] as
+        {"code": <int>, "jid": <full jid>, "name": <remote name>}
+    so the hub/Touch that is showing the code can pick it up.  The 16-digit
+    flow instead POSTs to 16digits_pairing.php; here that endpoint is not used.
+    """
+    if args.dry:
+        log("DRY RUN: would register an XMPP account, join shared@conference.%s"
+            % DOMAIN)
+        log("         send {\"code\": %d, \"jid\": <generated>, \"name\": <host>}"
+            % int(code))
+        log("         then wait for the installation to <presence type=\"subscribe\">")
+        log("         us; its local part is the house room (REPORT.md E-M5)")
+        return True
+
+    part, local, jid_full = make_jid()
+    password = make_password()
+    log("4-digit eSMART-Touch pairing (E-P3, no cloud POST)")
+    log("kJIDRandomPart =", part)
+    log("kJID           =", local)
+    log("kXmppPassword  =", password)
+    log("full JID       =", jid_full)
+
+    try:
+        body, room = announce_four_digit_code(
+            jid_full, password, code, verbose=args.verbose,
+            insecure=args.insecure_tls)
+    except EsmartError as e:
+        log("AUTH FAILED:", e)
+        return False
+
+    if not room:
+        # No subscription arrived, so the installation never accepted us.
+        log("pairing not confirmed: nobody subscribed to %s" % jid_full)
+        save_env(args.out, jid_full, password, "shared", code)
+        print("\nThe code was announced, but the installation never subscribed to")
+        print("us -- that subscription is what confirms pairing (see REPORT.md E-M5).")
+        print("On the tablet press \"Add a remote\" again so a FRESH 4-digit code is")
+        print("shown, then re-run immediately; the code is only valid about a minute.")
+        return False
+
+    save_env(args.out, jid_full, password, room, code)
+
+    # confirm, exactly like the 16-digit path does
+    ok = probe(jid_full, password, room, args, code=code)
+    if ok:
+        print("\nAll good.  Start the bridge with:")
+        print("   python3 esmart.py        (or double-click 'Start eSMART')")
+    else:
+        print("\nThe code was announced on the shared room, but no <structure>")
+        print("came back.  On the tablet press \"Add a remote\" again so a fresh")
+        print("4-digit code is shown, then re-run immediately -- the code is only")
+        print("valid for about a minute.")
+    return ok
+
+
 def main():
     ap = argparse.ArgumentParser(description="pair with an eSMART tablet code")
-    ap.add_argument("code", nargs="?", help="the 16 digits from the tablet")
+    ap.add_argument("code", nargs="?", help="the 4 digits (eSMART-Touch) or 16 digits (newer) from the tablet")
     ap.add_argument("--dry", action="store_true", help="print everything, send nothing")
     ap.add_argument("--rejoin", action="store_true",
                     help="skip pairing, just re-verify credentials already in .esmart.env")
@@ -126,8 +253,9 @@ def main():
     if args.rejoin:
         if not os.path.exists(args.out):
             sys.exit("no %s -- run the pairing first" % args.out)
-        env = dict(l.split("=", 1) for l in open(args.out).read().splitlines()
-                   if l.startswith("export "))
+        env = dict(l[len("export "):].split("=", 1)
+                   for l in open(args.out).read().splitlines()
+                   if l.startswith("export ") and "=" in l)
         jid, pw = env["ESMART_JID"], env["ESMART_PASSWORD"]
         room = env.get("ESMART_ROOM", "shared").strip('"')
         log("re-verifying", jid)
@@ -135,6 +263,9 @@ def main():
         return
 
     code = read_code(args)
+
+    if len(code) == 4:
+        sys.exit(0 if pair_four_digit(code, args) else 1)
 
     # ---- 1. credentials, generated exactly like the app -----------------
     part, local, jid_full = make_jid()
@@ -162,22 +293,25 @@ def main():
         log("DRY RUN stops here (a real POST would now register the account)")
         return
 
-    # ---- 3./4. register + verify ---------------------------------------
+    # ---- 3./4. create the account, then wait for the subscription ------
     if not args.no_register:
+        c = EsmartXMPP(jid_full, "unused", host=XMPPHOST, port=XMPPPORT,
+                       verbose=args.verbose, insecure=args.insecure_tls)
         try:
-            cli = EsmartXMPP(jid_full, "pre-auth-placeholder", host=XMPPHOST,
-                             port=XMPPPORT, verbose=args.verbose,
-                             insecure=args.insecure_tls)
-            cli.connect()
-            cli.register(local, password)
-            cli.close()
+            c.register_new_account(local, password)
         except EsmartError as e:
             log("registration step:", e)
-            log("(ejabberd may have auto-created the account during pairing;"
-                " continuing to the auth probe)")
+            log("(the cloud may have created the account during the POST)")
+        finally:
+            c.close()
 
-    save_env(args.out, jid_full, password, "shared", code)
-    ok = probe(jid_full, password, "shared", args, code=code)
+    log("waiting for the installation to subscribe to us ...")
+    room = discover_paired_room(jid_full, password, verbose=args.verbose,
+                                insecure=args.insecure_tls)
+    if not room:
+        log("nobody subscribed to %s -- pairing not confirmed" % jid_full)
+    save_env(args.out, jid_full, password, room or "shared", code)
+    ok = probe(jid_full, password, room or "shared", args, code=code)
     if ok:
         print("\nAll good.  Start the bridge with:")
         print("   python3 esmart.py        (or double-click 'Start eSMART')")
@@ -227,6 +361,8 @@ def probe(jid, password, room, args, code=None):
         log("node list -> %s-structure.json" % os.path.splitext(args.out)[0])
     else:
         log("no <structure> reply in 12s. Raw messages:")
+        if not msgs:
+            print("    (nothing at all came back on the room)")
         for m in msgs[:5]:
             print("   ", json.dumps(m)[:300])
     cli.close()

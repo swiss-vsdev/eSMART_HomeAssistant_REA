@@ -1,0 +1,101 @@
+[
+  {
+    "id": 1,
+    "name": "Bad 1",
+    "type_id": 6,
+    "type_name": "Heating",
+    "kind": "Temp",
+    "room": "Tous les modules",
+    "floor": "E2-B1"
+  },
+  {
+    "id": 13,
+    "name": "Licht 1",
+    "type_id": 2,
+    "type_name": "Lampe",
+    "kind": "OnOff",
+    "room": "Lichten",
+    "floor": "E2-B1"
+  },
+  {
+    "id": 14,
+    "name": "Balkon",
+    "type_id": 2,
+    "type_name": "Lampe",
+    "kind": "OnOff",
+    "room": "Lichten",
+    "floor": "E2-B1"
+  },
+  {
+    "id": 25,
+    "name": "Zimmer 1",
+    "type_id": 6,
+    "type_name": "Heating",
+    "kind": "Temp",
+    "room": "Tous les modules",
+    "floor": "E2-B1"
+  },
+  {
+    "id": 26,
+    "name": "Wohnen",
+    "type_id": 6,
+    "type_name": "Heating",
+    "kind": "Temp",
+    "room": "Tous les modules",
+    "floor": "E2-B1"
+  },
+  {
+    "id": 385,
+    "name": "korridor",
+    "type_id": 2,
+    "type_name": "Lampe",
+    "kind": "OnOff",
+    "room": "Lichten",
+    "floor": "E2-B1"
+  },
+  {
+    "id": 386,
+    "name": "Küche",
+    "type_id": 2,
+    "type_name": "Lampe",
+    "kind": "OnOff",
+    "room": "Lichten",
+    "floor": "E2-B1"
+  },
+  {
+    "id": 393,
+    "name": "Bad",
+    "type_id": 2,
+    "type_name": "Lampe",
+    "kind": "OnOff",
+    "room": "Lichten",
+    "floor": "E2-B1"
+  },
+  {
+    "id": 394,
+    "name": "Schlafzimmer",
+    "type_id": 2,
+    "type_name": "Lampe",
+    "kind": "OnOff",
+    "room": "Lichten",
+    "floor": "E2-B1"
+  },
+  {
+    "id": 401,
+    "name": "wohnzimmer",
+    "type_id": 2,
+    "type_name": "Lampe",
+    "kind": "OnOff",
+    "room": "Lichten",
+    "floor": "E2-B1"
+  },
+  {
+    "id": 402,
+    "name": "Table",
+    "type_id": 2,
+    "type_name": "Lampe",
+    "kind": "OnOff",
+    "room": "Lichten",
+    "floor": "E2-B1"
+  }
+]

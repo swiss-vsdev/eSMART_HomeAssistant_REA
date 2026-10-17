@@ -2,9 +2,9 @@
 
 Control your **eSMART (myeSMART)** home devices from the **Apple Home app**
 (HomeKit) and from a **simple web page** — through a small local bridge that
-speaks the eSMART app's own XMPP protocol. Pair once with the 16-digit code
-shown on your tablet and your devices appear. No cloud account, nothing to
-configure by hand.
+speaks the eSMART app's own XMPP protocol. Pair once with the code shown on
+your tablet — 4 digits on an eSMART-Touch, 16 on newer screens — and your
+devices appear. No cloud account, nothing to configure by hand.
 
 Every protocol claim in this code was verified against the shipped
 eSMART-live app; the evidence is in [REPORT.md](REPORT.md).
@@ -22,9 +22,10 @@ que pour Apple Maison (facultatif).
      (la toute première fois : clic droit → **Ouvrir**).
    * **Windows** : double-cliquez `Start eSMART.bat`.
    * **Raspberry Pi / Linux** : `./start-esmart.sh`.
-3. La **page d'appairage** s'ouvre dans le navigateur : tapez les
-   **16 chiffres affichés sur la tablette** eSMART. Gardez l'écran
-   d'appairage ouvert — le code expire en général au bout de quelques minutes.
+3. La **page d'appairage** s'ouvre dans le navigateur : tapez le code affiché
+   sur la tablette eSMART (**4 chiffres** sur une eSMART-Touch, **16** sur les
+   écrans plus récents). Gardez l'écran d'appairage ouvert — le code expire en
+   général au bout d'une minute.
 4. C'est prêt :
    * **Page web de contrôle** : http://127.0.0.1:8090/
    * **Apple Maison** : app Maison → `+` → *Ajouter un accessoire* →
@@ -55,7 +56,7 @@ Pour tout arrêter : double-cliquez `Stop eSMART.command` / `Stop eSMART.bat`
 | **Python 3** | runs the bridge | macOS: preinstalled (one-click prompt may appear). Windows: <https://www.python.org/downloads/> (tick *Add python.exe to PATH*). Linux/Pi: `sudo apt install python3` (usually already there). |
 | Internet | the bridge talks to the eSMART cloud (`xmpp.myesmart.net`) | — |
 | **Node.js** *(optional)* | only for Apple Home / HomeKit | macOS: `brew install node`. Pi: `sudo apt install nodejs npm`. Windows: <https://nodejs.org> (LTS installer). |
-| Your tablet's | 16-digit pairing code | shown in the eSMART app on the pairing / "associate remote" screen — it is valid for a short time only |
+| Your tablet's | pairing code | shown in the eSMART app on the pairing / "associate remote" screen — **4 digits** on an eSMART-Touch, **16** on newer screens; it is valid for a short time only |
 
 ### Quick start
 
@@ -68,7 +69,8 @@ Pour tout arrêter : double-cliquez `Stop eSMART.command` / `Stop eSMART.bat`
    * **Windows** — double-click `Start eSMART.bat`.
    * **Raspberry Pi / Linux** — `./start-esmart.sh`.
 3. The pairing page opens in your browser. On the tablet, open the
-   **pairing / associate-remote screen**, then type the **16 digits**.
+   **pairing / associate-remote screen**, then type the code it shows
+   (**4 digits** on an eSMART-Touch, **16** on newer screens).
 4. Done. The window shows the web page address, and — if Node.js is present —
    the HomeKit PIN.
 

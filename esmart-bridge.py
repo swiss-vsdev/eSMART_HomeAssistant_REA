@@ -338,8 +338,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 length = int(self.headers.get("Content-Length", 0))
                 payload = json.loads(self.rfile.read(length).decode("utf-8"))
                 code = "".join(ch for ch in str(payload.get("code", "")) if ch.isdigit())
-                if len(code) != 16:
-                    return self._send_json({"error": "need 16 digits, got %d" % len(code)}, 400)
+                if len(code) not in (4, 16):
+                    return self._send_json(
+                        {"error": "need 4 digits (eSMART-Touch) or 16 digits, got %d"
+                                  % len(code)}, 400)
+                if len(code) == 4:
+                    return self._handle_web_pair_four(code)
                 return self._handle_web_pair(code)
 
             self._send_json({"error": "unknown POST endpoint", "path": self.path}, 404)
@@ -383,6 +387,34 @@ class Handler(http.server.BaseHTTPRequestHandler):
         BRIDGE.room = "shared"
         return self._send_json({"status": "paired", "jid": jid_full, "reply": reply})
 
+    def _handle_web_pair_four(self, code: str):
+        """eSMART-Touch pairing: no cloud POST, just the XMPP code message (E-P3)."""
+        import importlib.util
+        from esmart_core import make_jid, make_password
+        spec = importlib.util.spec_from_file_location(
+            "esmart_pair", os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                        "esmart-pair.py"))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        part, local, jid_full = make_jid()
+        password = make_password()
+        try:
+            body, room = mod.announce_four_digit_code(
+                jid_full, password, code, insecure=BRIDGE.insecure, wait=45.0)
+        except EsmartError as e:
+            return self._send_json({"error": "pairing failed: %s" % e}, 502)
+        if not room:
+            return self._send_json(
+                {"error": "the installation never accepted us -- press \"Add a "
+                          "remote\" for a fresh code and try again right away "
+                          "(it expires after about a minute)"}, 502)
+        mod.save_env(ENV_CANDIDATES[0], jid_full, password, room, code)
+        BRIDGE.jid = jid_full
+        BRIDGE.password = password
+        BRIDGE.room = room
+        return self._send_json({"status": "paired", "jid": jid_full,
+                                "room": room, "reply": "paired"})
+
     def _send_pair_page(self):
         html = """<!doctype html><html><head><meta charset="utf-8">
 <title>eSMART -- Pair with Tablet</title>
@@ -397,8 +429,9 @@ button:hover{background:#66fcf1}
 .err{background:#331f24;color:#f1667a;border:1px solid #a24555}
 </style></head><body>
 <h1>Pair eSMART with Tablet</h1>
-<p>Open the pairing screen on your tablet and type the 16 digits displayed there:</p>
-<input id="code" maxlength="19" placeholder="•••• •••• •••• ••••" autofocus>
+<p>Open the pairing screen on your tablet and type the code displayed there.<br>
+eSMART-Touch shows <b>4 digits</b> ("Add a remote"); newer screens show <b>16</b>.</p>
+<input id="code" maxlength="19" placeholder="•••• or •••• •••• •••• ••••" autofocus>
 <button onclick="pair()">Pair</button>
 <div id="msg"></div>
 <script>
@@ -409,9 +442,9 @@ inp.addEventListener('input', e => {
 });
 async function pair(){
   const msg = document.getElementById('msg');
-  msg.style.display = 'block'; msg.className = ''; msg.textContent = 'Pairing with eSMART cloud...';
+  msg.style.display = 'block'; msg.className = ''; msg.textContent = 'Pairing -- keep the tablet screen open, this takes a few seconds...';
   const code = inp.value.replace(/\\D/g, '');
-  if(code.length !== 16){ msg.className='err'; msg.textContent='Please enter all 16 digits.'; return; }
+  if(code.length !== 4 && code.length !== 16){ msg.className='err'; msg.textContent='Please enter all 4 or all 16 digits.'; return; }
   try {
     const r = await fetch('/api/pair', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({code})});
     const j = await r.json();
@@ -456,7 +489,7 @@ def main():
     print(" HTTP API  : http://%s:%d" % (args.host, args.port))
     print(" Web UI    : http://%s:%d/" % (args.host, args.port))
     print(" Web Pair  : http://%s:%d/pair" % (args.host, args.port))
-    print("             (first run: enter the 16 digits from your tablet there)")
+    print("             (first run: enter the code from your tablet there -- 4 or 16)")
     print(" Mode      : %s" % ("DRY-RUN (no network traffic)" if args.dry else "LIVE"))
     print(" JID       : %s" % (BRIDGE.jid or "(none -- run ./esmart-pair.py or visit /pair)"))
     print(" Room      : %s" % BRIDGE.room)

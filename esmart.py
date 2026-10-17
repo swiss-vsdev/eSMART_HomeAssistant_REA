@@ -253,7 +253,7 @@ def print_ready(port, host, pin, paired, homekit_running):
     say(" Web controls : %s/" % base)
     if not paired:
         say(" Pairing page : %s/pair" % base)
-        say("                enter the 16 digits shown on your tablet")
+        say("                enter the code shown on your tablet (4 or 16 digits)")
     if homekit_running:
         say(" HomeKit      : published; setup code (PIN) %s" % pin)
         say("                On iPhone/iPad: Home app -> + -> Add Accessory")
@@ -306,8 +306,8 @@ def cmd_start(args):
     opened_pair = False
     if not paired:
         say("")
-        say("PAIRING: enter the 16-digit code from your tablet in the browser")
-        say("page. (On the tablet: open the pairing / associate-remote screen.)")
+        say("PAIRING: enter the code from your tablet in the browser page")
+        say("(4 digits on an eSMART-Touch, 16 on newer screens).")
         if not args.no_open:
             open_browser("http://%s:%d/pair" % (host, port))
             opened_pair = True
@@ -392,7 +392,13 @@ def cmd_run(args):
 
 
 def cmd_pair(args):
-    argv = [sys.executable, PAIR]
+    argv = [sys.executable, "-u", PAIR]
+    if getattr(args, "code", None):
+        argv.append(args.code)
+    if getattr(args, "verbose", False):
+        argv.append("--verbose")
+    if getattr(args, "dry", False):
+        argv.append("--dry")
     if args.rejoin:
         argv.append("--rejoin")
     try:
@@ -517,6 +523,12 @@ def main(argv=None):
     p.set_defaults(func=cmd_run)
 
     p = sub.add_parser("pair", help="terminal pairing (SSH / headless)")
+    p.add_argument("code", nargs="?",
+                   help="the pairing code from the tablet (4 or 16 digits); asks if omitted")
+    p.add_argument("-v", "--verbose", action="store_true",
+                   help="print every XMPP stanza sent and received")
+    p.add_argument("--dry", "--dry-run", dest="dry", action="store_true",
+                   help="show what would be sent, send nothing")
     p.add_argument("--rejoin", action="store_true",
                    help="skip pairing, re-verify the stored credentials")
     p.set_defaults(func=cmd_pair)

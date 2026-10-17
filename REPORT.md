@@ -105,6 +105,30 @@ additionally confirmed to fall inside the claimed method's entry range.
   recorded server replies live in `esmart-pair.py`.
 * Not re-run in this pass (requires a real 16-digit tablet code).
 
+### E-P3 — four-digit (eSMART-Touch) pairing — VERIFIED (addresses) + LIVE
+
+* Claim: an eSMART-Touch pairs by a *message*, not by HTTP. The screen shows
+  four digits ("Press 'Add a remote'. A sequence of four numbers appears on your
+  eSMART-Touch… You have one minute to enter the same sequence." — 
+  `en.lproj/Localizable.strings`, key `help text`).
+* Evidence (code): `PairingViewController` drives a `CodeViewer` capped at 4
+  (`toggleNumber:` @ `0x1000303e4`) and fires `[[self appDelegate] sendCode:]`
+  @ `0x1000304c0`. `-[AppDelegate sendCode:]` @ `0x10000db20` builds
+  `{"code": <int>, "jid": <full jid>, "name": <DeviceKitInfo.safeDescription>}`
+  and passes the bare JSON to `-<XMPPRoom sendMessageWithBody:>` on the room from
+  `-[AppDelegate joinSharedRoom]` @ `0x10000d8f4`, i.e.
+  `shared@conference.myesmart.net` (E-M1/E-M2). It is not the MessageProtocol
+  envelope (E-W2). `16digits_pairing.php` and the salt string each occur exactly
+  once in the binary, both inside `PairingNewViewController callAPI`
+  (E-P1), so the four-digit flow never touches the HTTP endpoint.
+* Evidence (live): the server advertises
+  `<register xmlns='http://jabber.org/features/iq-register'/>` on the
+  *pre-authentication* stream after STARTTLS, and its registration form asks for
+  `username` and `password` only — so a fresh four-digit pairing can create its
+  own account without the cloud side effect of the 16-digit POST.
+* Note: the code is sent as a number, so a displayed `0034` reaches the hub as
+  `34`.
+
 ## Registration
 
 ### E-R1 — createAccount — VERIFIED (method)
@@ -117,7 +141,9 @@ additionally confirmed to fall inside the claimed method's entry range.
 
 * Claim: the in-band registration form asks for `<username>` and `<password>`
   only.
-* Evidence: live probe during development; not re-run.
+* Evidence: live probe during development; not re-run. Re-confirmed at the
+  pre-auth stage too (see E-P3): the empty form is
+  `<instructions>Choose a username and password to register with this server</instructions><username></username><password/>`.
 
 ## Wire format
 
@@ -151,6 +177,12 @@ additionally confirmed to fall inside the claimed method's entry range.
 * Evidence: the shipped arm64 dylib
   `Frameworks/XMPPFramework.framework/XMPPFramework` contains both
   `sendMessageWithBody` and the literal `groupchat`.
+* Evidence (live, FLAGGED): the `to` must be the **bare room JID**. Sending
+  `to="<room>@conference.myesmart.net/<nick>"` is rejected by the live server:
+  `<error code='400' type='modify'><bad-request xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/>`.
+  With the bare room JID the MUC echoes the body back to the sender, which is how
+  delivery is confirmed (XEP-0045). Self-echo must therefore be filtered before
+  treating a body as the central's answer.
 
 ### E-W6 — fixtures fallback version — VERIFIED
 
@@ -186,6 +218,26 @@ additionally confirmed to fall inside the claimed method's entry range.
 * Claim: the room join sends `<history maxstanzas="0"/>` to suppress replay.
 * Evidence: `"maxstanzas"` @ `0x10063ff50` referenced in `joinSharedRoom`
   (`0x10000da4c`) and `joinRoom:` (`0x10000e374`).
+
+### E-M5 — pairing is confirmed by a subscription, not by the room — VERIFIED
+
+* Claim: after the code is sent, the pairing finishes when the installation
+  sends us `<presence type="subscribe"/>`; the house room is the local part of
+  the subscriber's bare JID. Nothing arrives on the shared room.
+* Evidence: `-[AppDelegate xmppStream:didReceivePresence:]` (log literal at
+  `AppDelegate.m`, method spans `0x1000104xx`). At `0x1000104a4` it compares the
+  presence `type` against `@"subscribe"` (`0x100640590`), logs
+  `"Presence user wants to subscribe %@"` (`0x1006405b0`), calls
+  `acceptSubscription:`, builds
+  `[NSString stringWithFormat:@"%@\x40conference.%@" , <local part>, @"myesmart.net"]`
+  at `0x1000105a4` (the E-M2 format), and `dispatch_after` 0.5 s
+  (`_dispatch_time` `w1 = 0x001dcd6500` = 500 ms, then `_dispatch_after`
+  `0x10001061c`) posts `kShowDevicesList` and `kHidePairingView`
+  (`0x10002f7fc`-`0x10002f840`, whose observers hide the pairing screen and show
+  the device list).
+* Consequence: a client that only posts the code and reads the shared room can
+  wait forever. It must stay online, accept the subscription, and then join the
+  announced room. This is the step the bridge was missing.
 
 ## Node model
 
@@ -321,6 +373,15 @@ consistency with the original analysis.
 5. **Fixture timestamps are malformed in the shipped data**
    (`"2014-07-1116:04:27Z"` — missing space). Ship data quirk, not a client
    bug.
+6. **Four-digit pairing (E-P3) — mechanics live-proven, the final handshake still
+   needs a real tablet code.** Live-verified against the real server: pre-auth
+   in-band registration, SASL auth, bind, joining `shared`, and the code message
+   being accepted (echoed by the MUC). What is *not* yet observed is the
+   installation's `<presence type="subscribe">` (E-M5), because that requires a
+   code that is actually armed on the wall screen. Until then the pairing path is
+   wired per the binary but unconfirmed end-to-end. Diagnostics: `python3
+   esmart.py pair <code> --verbose` prints every stanza and reports
+   `pairing not confirmed: nobody subscribed to ...` if the handshake stalls.
 
 ## Provenance
 
