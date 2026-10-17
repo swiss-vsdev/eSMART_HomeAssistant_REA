@@ -5,3 +5,4 @@ node_modules/
 .esmart.env
 .esmart-run/
 hap-data/
+.esmart-structure.json
