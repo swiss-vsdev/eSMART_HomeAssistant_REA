@@ -82,7 +82,7 @@ def load_env():
 # How often to re-request node state from the master (seconds).  The master
 # pushes changes into the room on its own; this is only a safety net.
 POLL_SECS = int(os.getenv("ESMART_POLL_SECS", "30"))
-DEFAULT_PIN = "12345678"
+DEFAULT_PIN = "03145154"
 
 
 def gateway_ip() -> str:

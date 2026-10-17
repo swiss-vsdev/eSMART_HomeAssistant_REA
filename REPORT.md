@@ -43,7 +43,7 @@ binary. The bridge is running, paired, online, and controlling devices:
   `Küche`, `Bad`, `Schlafzimmer`, `wohnzimmer`, `Table`.
 * Control verified: `POST /api/node/393/off` then `/on` — the master pushes the
   new `onoff` back into the room and the page shows it.
-* HomeKit: published as `eSMART Bridge`, PIN `12345678`,
+* HomeKit: published as `eSMART Bridge`, PIN `03145154`,
   `X-HM://0023OA632ESMART`. 11 accessories exposed.
 * Autostart: `python3 esmart.py autostart on` installs a macOS LaunchAgent.
 * Credentials are in `.esmart.env` (mode 600, git-ignored); the device list is

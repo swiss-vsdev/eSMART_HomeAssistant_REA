@@ -29,7 +29,7 @@ que pour Apple Maison (facultatif).
 4. C'est prêt :
    * **Page web de contrôle** : http://127.0.0.1:8090/
    * **Apple Maison** : app Maison → `+` → *Ajouter un accessoire* →
-     « Je n'ai pas de code » → code `12345678`.
+     « Je n'ai pas de code » → code `03145154`.
 
 Pour tout arrêter : double-cliquez `Stop eSMART.command` / `Stop eSMART.bat`
 (ou `./stop-esmart.sh`). En cas de souci : `python3 esmart.py check`.
@@ -81,7 +81,7 @@ straight to the control page.
 
 1. On iPhone/iPad: **Home app → + → Add Accessory → "I Don't Have a Code"**.
 2. Pick **eSMART Bridge** from the list, enter the setup code (PIN) shown by
-   Start — the default is **`12345678`**.
+   Start — the default is **`03145154`** (formatted 031-45-154).
 3. Accept the accessory list; your rooms/devices appear.
 
 Change the PIN with `ESMART_HOMEKIT_PIN=87654321` in the environment, or

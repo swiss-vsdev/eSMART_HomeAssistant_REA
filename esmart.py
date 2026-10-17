@@ -35,7 +35,7 @@ HOMEBRIDGE_DIR = os.path.join(ROOT, "homebridge-esmart")
 HAP_DIR = os.path.join(HOMEBRIDGE_DIR, "node_modules", "hap-nodejs")
 HOMEKIT_JS = os.path.join(HOMEBRIDGE_DIR, "esmart-homekit.js")
 DEFAULT_PORT = 8090
-DEFAULT_PIN = "12345678"
+DEFAULT_PIN = "03145154"
 
 
 # ---------------------------------------------------------------------------

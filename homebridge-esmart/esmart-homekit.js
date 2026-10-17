@@ -7,7 +7,7 @@
  * local esmart-bridge.py HTTP daemon for the XMPP side of things, so the
  * protocol is implemented exactly once.
  *
- *   node esmart-homekit.js --port 8090 --pin 12345678
+ *   node esmart-homekit.js --port 8090 --pin 03145154
  *
  * Pair with the Home app on an iPhone: scan the QR code on the console.
  * Standalone mode needs hap-nodejs (declared as an optional dependency of
@@ -15,6 +15,7 @@
  */
 "use strict";
 
+const path = require("path");
 const { BridgeClient } = require("./esmart-client");
 const { buildAccessory } = require("./esmart-accessory");
 const { displayName } = require("./esmart-map");
@@ -42,7 +43,7 @@ const arg = (name, def) => {
 };
 const PORT = Number(arg("--port", "8090"));
 const BRIDGE_NAME = arg("--name", "eSMART Bridge");
-const PIN = arg("--pin", process.env.ESMART_HOMEKIT_PIN || "12345678");
+const PIN = arg("--pin", process.env.ESMART_HOMEKIT_PIN || "03145154");
 const BRIDGE_URL = arg("--bridge-url", "http://127.0.0.1:8090");
 const POLL_MS = Math.max(1000, Number(arg("--poll", "30000")));
 const BLINDS_INVERT = /1|true|yes/i.test(arg("--blinds-invert", "false"));
@@ -136,7 +137,10 @@ async function main() {
 
   // Keep hap-nodejs storage away from the Homebridge config dir and any
   // other plugin's data -- only relevant when running standalone.
-  HAP.HAPStorage.setCustomStoragePath(arg("--storage", "./hap-data"));
+  // Absolute on purpose: a relative path would make the HomeKit identity
+  // (the HAP username/key derived from it) depend on the current directory,
+  // and a lost identity means Home sees a brand-new, already-paired accessory.
+  HAP.HAPStorage.setCustomStoragePath(arg("--storage", path.join(__dirname, "hap-data")));
 
   // The HAP `username` must be a MAC address (hap-nodejs asserts the format),
   // not a display name.  Derive a stable one from the bridge UUID.

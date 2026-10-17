@@ -107,7 +107,7 @@ Each node maps to a HomeKit service:
 ## Standalone (no Homebridge)
 
 ```sh
-node esmart-homekit.js --bridge-url http://127.0.0.1:8090 --pin 12345678
+node esmart-homekit.js --bridge-url http://127.0.0.1:8090 --pin 03145154
 ```
 
 Standalone mode needs `hap-nodejs`: run `npm install` once inside this folder
@@ -132,7 +132,7 @@ Pair with the Home app using the PIN. `--port`, `--name`, `--poll`,
 * `.esmart.env` contains your eSMART account credentials; it is chmod 600.
 * The bridge listens on 127.0.0.1 by default; only bind it to your LAN if you
   trust every host on it (it has no auth on its own).
-* HomeKit pairing uses the PIN you set (`12345678` in the examples — change it
+* HomeKit pairing uses the PIN you set (`03145154` in the examples — change it
   for anything but a throwaway test).
 
 ## License
