@@ -119,34 +119,46 @@ function buildAccessory(node, ctrl, hap, log, existingAcc) {
       const tgtM = svc.getCharacteristic(C.TargetHeatingCoolingState);
       const units = svc.getCharacteristic(C.TemperatureDisplayUnits);
       units.updateValue(C.TemperatureDisplayUnits.CELSIUS);
-      const modeToHK = (m) =>
-        m === "heat" ? C.TargetHeatingCoolingState.HEAT :
-        m === "cool" ? C.TargetHeatingCoolingState.COOL :
-        C.TargetHeatingCoolingState.OFF;
-      cur.on(E.GET, (cb) => cb(null, state().temperature || 20));
-      tgt.on(E.GET, (cb) => cb(null, state().setpoint || 20));
-      curM.on(E.GET, (cb) => cb(null, modeToHK(state().mode)));
-      tgtM.on(E.GET, (cb) => cb(null, modeToHK(state().mode)));
+      // These nodes are "Heating" (type_id 6, type_name from the structure).
+      // The hub never tells us a mode: `mode` and `deviceOnOff` are display
+      // fields the app only *reads* (E-C5, `deviceOnOff` has 2 xrefs, both in a
+      // display chain), while `setpoint` is what TempNodeView actually writes.
+      // So offer heat/off only, and default to HEAT: with TargetHeatingCooling
+      // State left at OFF the Home app greys out the temperature and you cannot
+      // set it at all.
+      tgtM.setProps({ validValues: [C.TargetHeatingCoolingState.OFF,
+                                    C.TargetHeatingCoolingState.HEAT] });
+      // The wire format is an integer ("setpoint": int(round(x)), E-C5), so a
+      // finer step in Home would just be silently rounded on the way out.
+      tgt.setProps({ minValue: 5, maxValue: 35, minStep: 1 });
+      const mode = (s) => (s.mode === "off"
+        ? C.TargetHeatingCoolingState.OFF : C.TargetHeatingCoolingState.HEAT);
+      const heating = (s) => (s.temperature != null && s.setpoint != null
+        && s.temperature < s.setpoint ? C.CurrentHeatingCoolingState.HEAT
+                                      : C.CurrentHeatingCoolingState.OFF);
+      // ?? not ||: a real 0 °C reading or 0 °C setpoint is valid data.
+      cur.on(E.GET, (cb) => cb(null, state().temperature ?? 20));
+      tgt.on(E.GET, (cb) => cb(null, state().setpoint ?? 20));
+      curM.on(E.GET, (cb) => cb(null, heating(state())));
+      tgtM.on(E.GET, (cb) => cb(null, mode(state())));
       tgtM.on(E.SET, async (v, cb) => {
         try {
-          const mode = v === C.TargetHeatingCoolingState.HEAT ? "heat" :
-                       v === C.TargetHeatingCoolingState.COOL ? "cool" : "off";
-          const sp = state().setpoint || 20;
-          await send(cmd.setpoint(node.id, sp, mode));
-          remember({ mode });
+          const m = v === C.TargetHeatingCoolingState.HEAT ? "heat" : "off";
+          await send(cmd.setpoint(node.id, state().setpoint || 20, m));
+          remember({ mode: m });
           cb();
         } catch (e) { cb(e); }
       });
+      // setpoint on its own is the write the master is confirmed to honour.
       tgt.on(E.SET, async (v, cb) => {
         try { await send(cmd.setpoint(node.id, v)); remember({ setpoint: v }); cb(); }
         catch (e) { cb(e); }
       });
       onStateUpdate = (s) => {
-        cur.updateValue(s.temperature || 20);
-        tgt.updateValue(s.setpoint || 20);
-        const m = modeToHK(s.mode);
-        curM.updateValue(m);
-        tgtM.updateValue(m);
+        cur.updateValue(s.temperature ?? 20);
+        tgt.updateValue(s.setpoint ?? 20);
+        curM.updateValue(heating(s));
+        tgtM.updateValue(mode(s));
       };
       break;
     }

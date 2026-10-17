@@ -23,6 +23,11 @@
  button.off{background:#8e8e93}
  button:disabled{background:#c7c7cc;cursor:default}
  .on{color:#0a7d2b;font-size:.8em} .off2{color:#8e8e93;font-size:.8em}
+  .thermo{display:flex;align-items:center;gap:10px}
+  .thermo .val{font-size:1.6em;font-weight:700;min-width:3.4em;text-align:center}
+  .thermo button{flex:0 0 auto;padding:0 14px}
+  .qr{margin-top:10px;text-align:center}
+  .qr img{width:180px;height:180px;image-rendering:pixelated;border:1px solid #e0e0e0;border-radius:8px}
 </style>
 </head>
 <body>
@@ -55,7 +60,9 @@ function renderStatus(s){
       +'<li>On iPhone/iPad open the <b>Home</b> app &rarr; <b>+</b> &rarr; <b>Add Accessory</b></li>'
       +'<li>Choose <b>I Don\'t Have a Code</b></li>'
       +'<li>Pick <b>eSMART Bridge</b> and enter the code <code>'+esc(s.pin)+'</code></li></ol>'
-      +'<p class="tag">Already added? The devices appear in your Home automatically.</p>';
+      +'<div class="qr"><img src="/api/qr.png" alt="Scan with the Home app" '
+        +'onerror="this.parentNode.style.display=\'none\'">'
+        +'<br><span class="tag">Scan this code with your iPhone camera, or type the code above.</span></div>';
   }
   if(s.gateway) html+='<p class="tag">This page from another device: <b>http://'+esc(s.gateway)+':'+location.port+'/</b> '
     +'(iPhone control works through the Home app, no URL needed).</p>';
@@ -70,6 +77,16 @@ function renderDevices(list){
     const live=on(d);
     const extra = d.state && d.state.temperature!=null ? ' &middot; '+d.state.temperature+'\u00b0C' : '';
     const ctrl = d.kind==='OnOff' || d.kind==='Dimmer';
+    if(d.kind==='Thermostat' || d.kind==='thermostat' || d.kind==='Temp'){
+      const sp = (d.state && d.state.setpoint!=null) ? d.state.setpoint : 20;
+      const cur = (d.state && d.state.temperature!=null) ? d.state.temperature : null;
+      return '<div class="dev"><div class="n">'+esc(d.name)+'</div>'
+        +'<div class="thermo"><button onclick="thermo('+d.id+',\'-\','+sp+')">−</button>'
+        +'<div class="val">'+esc(sp)+'\u00b0C</div>'
+        +'<button onclick="thermo('+d.id+',\'+\','+sp+')">+</button></div>'
+        +'<div class="'+(live?'on':'off2')+'">'+(live?'heating':'idle')
+        +(cur!=null?' &middot; '+cur+'\u00b0C':'')+'</div></div>';
+    }
     return '<div class="dev"><div class="n">'+esc(d.name)+'</div>'
       +'<div class="'+(live?'on':'off2')+'">'+(live?'on':'off')+esc(extra)+'</div>'
       +(ctrl?'<div class="btns"><button onclick="go('+d.id+',\'on\')">On</button>'
@@ -81,6 +98,16 @@ function renderDevices(list){
 async function go(id, onoff){
   document.querySelectorAll('button').forEach(b=>b.disabled=true);
   try{ await fetch(base+'/api/node/'+id+'/'+onoff, {method:'POST'}); }catch(e){}
+  setTimeout(refresh, 700);
+}
+
+async function thermo(id, dir, sp){
+  document.querySelectorAll('button').forEach(b=>b.disabled=true);
+  try{
+    sp += (dir==='+') ? 1 : -1;
+    if(sp < 5) sp = 5; if(sp > 35) sp = 35;
+    await fetch(base+'/api/thermo/'+id+'/'+sp, {method:'POST'});
+  }catch(e){}
   setTimeout(refresh, 700);
 }
 

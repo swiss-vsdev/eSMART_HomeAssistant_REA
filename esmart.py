@@ -236,6 +236,29 @@ def npm_install():
     return rc == 0
 
 
+def ensure_segno():
+    """Install the pure-Python QR writer if the QR page wants it.
+
+    Optional (like certifi): without it the page shows the setup code text
+    only, so a failure here must never stop the bridge.
+    """
+    code = ("import segno,io;b=io.BytesIO();"
+            "segno.make('x').save(b,kind='png');print('ok')")
+    try:
+        rc = subprocess.run([sys.executable, "-c", code],
+                            capture_output=True, timeout=20).returncode
+        if rc == 0:
+            return True
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    try:
+        rc = subprocess.run([sys.executable, "-m", "pip", "install", "--quiet", "segno"],
+                            timeout=120).returncode
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return rc == 0
+
+
 def open_browser(url):
     try:
         import webbrowser
@@ -455,6 +478,8 @@ def cmd_start(args):
                     else:
                         warn("npm install failed -- see %s" % _path("npm-install", ".log"))
             if os.path.isdir(HAP_DIR):
+                if not ensure_segno():
+                    say("QR pairing code skipped (pip install segno to get it)")
                 env2 = dict(os.environ)
                 env2["ESMART_HOMEKIT_PIN"] = pin
                 spawn("homekit",

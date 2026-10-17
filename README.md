@@ -79,7 +79,10 @@ straight to the control page.
 
 ### Apple Home (HomeKit) setup
 
-1. On iPhone/iPad: **Home app → + → Add Accessory → "I Don't Have a Code"**.
+1. On iPhone/iPad open the **Camera** app and scan the QR code on the web
+   page — the Home app opens with the bridge ready to add. (No QR? The page
+   also shows the code; **Home app → + → Add Accessory → "I Don't Have a
+   Code"** and enter the PIN.)
 2. Pick **eSMART Bridge** from the list, enter the setup code (PIN) shown by
    Start — the default is **`03145154`** (formatted 031-45-154).
 3. Accept the accessory list; your rooms/devices appear.

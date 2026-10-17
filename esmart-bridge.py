@@ -21,6 +21,8 @@ ENDPOINTS:
     POST /api/custom                raw JSON body -> forwards to room
     GET  /api/nodes                 returns cached structure / list of devices
     GET  /api/status                bridge status, room, JID, last error
+    GET  /api/setup-uri             HomeKit name/pin/setupURI (needs HomeKit running)
+    GET  /api/qr.png                pairing QR for the setup URI (needs `segno`)
     GET  /                          serves esmart-light.html
     GET  /pair                      minimal web form to submit the 16 digits
 
@@ -182,6 +184,20 @@ class BridgeState:
             return False
         return True
 
+    def homekit_setup_uri(self):
+        """The payload the accessory publishes (name/pin/URI/MAC).
+
+        Written by esmart-homekit.js next to hap-data so the web page can
+        render the pairing QR without re-deriving the base-36 math.
+        """
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                            ".esmart-run", "homekit.json")
+        try:
+            with open(path) as fh:
+                return json.load(fh)
+        except (OSError, ValueError):
+            return None
+
     def ensure_client(self) -> EsmartXMPP | None:
         if self.dry_run:
             return None
@@ -191,7 +207,8 @@ class BridgeState:
             if not self.is_configured():
                 raise EsmartError("Bridge not configured. Run ./esmart-pair.py first.")
             cli = EsmartXMPP(self.jid, self.password, host=self.host,
-                             port=self.port, insecure=self.insecure)
+                             port=self.port, insecure=self.insecure,
+                             verbose=bool(os.getenv("ESMART_VERBOSE")))
             cli.connect()
             cli.go_online(self.room)
             self.client = cli
@@ -256,7 +273,9 @@ class BridgeState:
         if isinstance(body, dict) and "id" in body:
             nid = body["id"]
             st = self.states.setdefault(nid, {})
-            for k in ("onoff", "dimming", "position", "orientation"):
+            # The master's own INFO echo takes ~10 s; without this the UI looks
+            # dead after a click.  A later master push simply overwrites it.
+            for k in ("onoff", "dimming", "position", "orientation", "setpoint", "mode"):
                 if k in body:
                     st[k] = body[k]
         return {"status": "sent", "raw": text, "body": body}
@@ -290,6 +309,35 @@ class Handler(http.server.BaseHTTPRequestHandler):
             data = fh.read()
         self.send_response(200)
         self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def _serve_qr_png(self):
+        """Render the HomeKit setup payload as a QR PNG for the web page.
+
+        segno is an optional, pure-Python dependency (the same pattern as
+        certifi).  When it is not installed the page falls back to the code
+        text, which already works — the QR is a convenience, not a control.
+        """
+        hk = BRIDGE.homekit_setup_uri()
+        if not hk or not hk.get("setupURI"):
+            return self._send_json({"error": "HomeKit not running"}, 503)
+        try:
+            import segno, io
+        except ImportError:
+            return self._send_json({"error": "segno not installed",
+                                     "hint": "pip install segno"}, 503)
+        try:
+            buf = io.BytesIO()
+            segno.make(hk["setupURI"], error="m").save(buf, kind="png",
+                                                       scale=8, border=2)
+            data = buf.getvalue()
+        except Exception as e:
+            return self._send_json({"error": "qr render failed: %s" % e}, 500)
+        self.send_response(200)
+        self.send_header("Content-Type", "image/png")
+        self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)
@@ -333,6 +381,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 merged["state"] = BRIDGE.states.get(nid, {})
                 out.append(merged)
             return self._send_json(out)
+        if p == "/api/setup-uri":
+            hk = BRIDGE.homekit_setup_uri()
+            return self._send_json(hk or {"error": "HomeKit not running"}, 200 if hk else 503)
+        if p == "/api/qr.png":
+            return self._serve_qr_png()
         self._send_json({"error": "unknown endpoint", "path": self.path}, 404)
 
     def do_POST(self):

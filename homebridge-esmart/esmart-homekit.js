@@ -15,6 +15,7 @@
  */
 "use strict";
 
+const fs = require("fs");
 const path = require("path");
 const { BridgeClient } = require("./esmart-client");
 const { buildAccessory } = require("./esmart-accessory");
@@ -130,10 +131,15 @@ const apiById = new Map();
 async function main() {
   const bridgeAcc = await buildBridge();
 
-  const pin = String(PIN);
+  let pin = String(PIN).replace(/-/g, "");
   if (pin.length !== 8 || !/^\d+$/.test(pin)) {
     throw new Error("--pin must be an 8-digit number (HomeKit requirement)");
   }
+  // hap-nodejs uses this string verbatim as the SRP *password*, and the Home
+  // app derives its password from the typed code in XXX-XX-XXX form.  Publish
+  // the dashed form or SRP proofs never match and Home says "setup code is
+  // incorrect".  setupURI() strips the dashes again for the payload.
+  const pincode = pin.slice(0, 3) + "-" + pin.slice(3, 5) + "-" + pin.slice(5);
 
   // Keep hap-nodejs storage away from the Homebridge config dir and any
   // other plugin's data -- only relevant when running standalone.
@@ -146,22 +152,52 @@ async function main() {
   // not a display name.  Derive a stable one from the bridge UUID.
   const mac = macAddress();
 
+  // The web page draws the pairing QR from this, because only this process
+  // knows the code, category and setup ID that go into the payload. Written
+  // next to the hap-data dir so the bridge can serve it without importing
+  // any of this.
+  // .esmart-run is the single runtime dir (pid file, logs) the bridge already
+// reads, so the QR lives there and survives a hap-data wipe.
+const statePath = path.join(arg("--storage", path.join(__dirname, "..", ".esmart-run")),
+                            "homekit.json");
+
   try {
     await bridgeAcc.publish({
       username: mac,
-      pincode: pin,
+      pincode: pincode,
       category: Categories.BRIDGE,
-      setupID: "ESMART",
+      // The setup ID must be exactly 4 base-36 characters: the payload is
+      // "X-HM://" + 9 payload chars + this ID, so a longer value corrupts the
+      // scan string.
+      setupID: "ESMA",
     }, true);
   } catch (e) {
     log("FATAL: publish failed: %s", e.message);
     process.exit(1);
   }
 
-  log("HomeKit bridge published as %s, PIN %s, MAC %s", BRIDGE_NAME, pin, mac);
-  log("Setup URI: %s", bridgeAcc.setupURI());
+  log("HomeKit bridge published as %s, setup code %s, MAC %s", BRIDGE_NAME, pincode, mac);
+  const setupURI = bridgeAcc.setupURI();
+  log("Setup URI: %s", setupURI);
   log("On the iPhone/iPad: Home app -> '+' -> Add Accessory -> 'I Don't Have\n" +
-      "a Code or Need to Set Up' -> enter setup code %s", pin);
+      "a Code or Need to Set Up' -> enter setup code %s", pincode);
+
+  // Hand the truth (the exact payload the accessory publishes) to the web
+  // page so it can render the pairing QR.  Remove it on exit so the QR
+  // stops appearing once HomeKit is down.
+  try {
+    fs.mkdirSync(path.dirname(statePath), { recursive: true });
+    fs.writeFileSync(statePath, JSON.stringify({
+      name: BRIDGE_NAME, pin: pincode, setupURI, mac, pid: process.pid,
+    }, null, 2) + "\n");
+  } catch (e) {
+    log("WARN: could not write %s: %s", statePath, e.message);
+  }
+  const cleanup = () => {
+    try { fs.unlinkSync(statePath); } catch (e) { /* already gone */ }
+  };
+  process.on("exit", cleanup);
+  process.on("SIGTERM", () => { cleanup(); process.exit(0); });
   log("If this Mac prompts for network access, allow it (mDNS/Bonjour).\n" +
       "Once paired, the eSMART devices appear as rooms/devices in Home.");
 
@@ -174,6 +210,19 @@ async function main() {
       const list = Array.isArray(nodes) ? nodes : [];
       for (const n of list) {
         const id = Number(n.id);
+        // The bridge may not know the structure yet when we publish (it asks
+        // the central for it over XMPP), so nodes can show up later.  Adding a
+        // bridged accessory after publish is supported: hap-nodejs enqueues a
+        // configuration update, and Home picks the new devices up.
+        if (!apiById.has(id)) {
+          const made = makeAccessory(n);
+          if (!made) continue;
+          apiById.set(id, made.api);
+          try {
+            bridgeAcc.addBridgedAccessory(made.acc);
+            log("added node %s (%s) after publish", id, made.acc.displayName);
+          } catch (e) { log("could not add node %s: %s", id, e.message); }
+        }
         const prev = lastState.get(id);
         const next = Object.assign({}, prev || {}, n.state || {});
         lastState.set(id, next);
@@ -189,6 +238,9 @@ async function main() {
   };
   setInterval(tick, POLL_MS);
   tick();
+  // Right after a restart the bridge usually does not know the structure yet;
+  // retry shortly after publish so devices show up without waiting a full poll.
+  setTimeout(tick, 4000);
 }
 
 main().catch((e) => {
