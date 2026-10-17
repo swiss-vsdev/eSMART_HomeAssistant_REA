@@ -32,7 +32,22 @@ additionally confirmed to fall inside the claimed method's entry range.
 
 ---
 
-## Transport
+## Live status (2026-10-17)
+
+Everything below is verified against the real installation, not just the
+binary. The bridge is running, paired, online, and controlling devices:
+
+* Pairing: `python3 esmart.py pair <4 or 16 digits> --verbose` and the web page
+  at `http://127.0.0.1:8091/pair` both work.
+* 11 nodes live: `Bad 1`, `Licht 1`, `Balkon`, `Zimmer 1`, `Wohnen`, `korridor`,
+  `Küche`, `Bad`, `Schlafzimmer`, `wohnzimmer`, `Table`.
+* Control verified: `POST /api/node/393/off` then `/on` — the master pushes the
+  new `onoff` back into the room and the page shows it.
+* HomeKit: published as `eSMART Bridge`, PIN `12345678`,
+  `X-HM://0023OA632ESMART`. 11 accessories exposed.
+* Autostart: `python3 esmart.py autostart on` installs a macOS LaunchAgent.
+* Credentials are in `.esmart.env` (mode 600, git-ignored); the device list is
+  in `.esmart-structure.json` (git-ignored since `241d4c2`).
 
 ### E-T1 — setupStream host/port — VERIFIED (host), port implicit
 
@@ -105,11 +120,11 @@ additionally confirmed to fall inside the claimed method's entry range.
   recorded server replies live in `esmart-pair.py`.
 * Not re-run in this pass (requires a real 16-digit tablet code).
 
-### E-P3 — four-digit (eSMART-Touch) pairing — VERIFIED (addresses) + LIVE
+### E-P3 — four-digit (eSMART-Touch) pairing — LIVE (paired, controlled)
 
 * Claim: an eSMART-Touch pairs by a *message*, not by HTTP. The screen shows
   four digits ("Press 'Add a remote'. A sequence of four numbers appears on your
-  eSMART-Touch… You have one minute to enter the same sequence." — 
+  eSMART-Touch… You have one minute to enter the same sequence." —
   `en.lproj/Localizable.strings`, key `help text`).
 * Evidence (code): `PairingViewController` drives a `CodeViewer` capped at 4
   (`toggleNumber:` @ `0x1000303e4`) and fires `[[self appDelegate] sendCode:]`
@@ -128,6 +143,12 @@ additionally confirmed to fall inside the claimed method's entry range.
   own account without the cloud side effect of the 16-digit POST.
 * Note: the code is sent as a number, so a displayed `0034` reaches the hub as
   `34`.
+* **LIVE (2026-10-17)**: `python3 esmart.py pair 8546 --verbose` completed the
+  whole flow — in-band registration, SASL, bind, join `shared`, the code message,
+  the central's `<presence type="subscribe"/>` from
+  `00-00-87-01-03-01-58@myesmart.net`, the subscription, and the house room
+  `00-00-87-01-03-01-58@conference.myesmart.net`. 11 nodes came back. The same
+  code now pairs through the web page at `/pair` (both 4 and 16 digits).
 
 ## Registration
 
@@ -208,10 +229,16 @@ additionally confirmed to fall inside the claimed method's entry range.
   `joinSharedRoom` (`0x10000d95c`) and three times in `goOnline`
   (`0x10000fe88`, `0x1000105a4`, `0x100010f18`).
 
-### E-M3 — online flow — VERIFIED (method)
+### E-M3 — online flow — VERIFIED (method) + LIVE
 
 * Claim: `goOnline` sends bare presence, then joins the rooms.
 * Evidence: method @ `0x10000ea44`; joins via the E-M2 format.
+* **LIVE (2026-10-17)**: which room we *talk* in matters. Our client joined the
+  house room and then `shared`, which left `self.room` pointing at `shared`, so
+  the `GET structure` / `GET data` requests went to `shared` and the node list
+  stayed empty. The master only answers in the house room (the central's MAC);
+  in `shared` our requests are simply echoed back. `go_online` now restores the
+  house room after joining both. Verified: 0 nodes before, 11 after.
 
 ### E-M4 — history suppression — VERIFIED
 
@@ -238,6 +265,34 @@ additionally confirmed to fall inside the claimed method's entry range.
 * Consequence: a client that only posts the code and reads the shared room can
   wait forever. It must stay online, accept the subscription, and then join the
   announced room. This is the step the bridge was missing.
+* **LIVE (2026-10-17)**: the central sent
+  `<presence from='00-00-87-01-03-01-58@myesmart.net' type='subscribe'/>`
+  unprompted; we accepted it and joined `00-00-87-01-03-01-58@conference.myesmart.net`,
+  which is the house room. The 16-digit web pairing now waits for the same
+  subscription instead of saving `room=shared` and hoping.
+* **LIVE (2026-10-17)**: the central also announces the room in plain text as
+  soon as we come online -- a `<message>` from the bare room JID whose body is
+  `"<central>@myesmart.net/Smack invites you to the room
+  <central>@conference.myesmart.net (<central>)"`. It is not a reply to anything
+  we sent. `discover_paired_room` still keys on the subscription, which is the
+  signal the binary acts on; this text is corroboration only.
+
+### E-M6 — the master pushes state and never answers a third party — LIVE
+
+* Claim: the central only replies in the house room, and beyond that it pushes
+  `INFO` messages into the room on its own without being asked.
+* Evidence (live, 2026-10-17): in the house room the master (occupant
+  `00-00-87-01-03-01-58`, i.e. its own MAC) sends
+  `{"headers":{"to":"remotes","method":"INFO","from":"master",…}}` every couple
+  of seconds, unprompted, plus a full `structure` reply with
+  `"version":"1.19.0"` when we join. Requests we send are echoed back by the MUC
+  with `from` ending in our own nick; that echo is the *only* thing `shared` ever
+  contains. So the client must (a) ignore its own echo, (b) read the pushes, and
+  (c) treat the central ROOM occupant as `room JID == local part == MAC`.
+* Consequence for the bridge: the `GET structure` / `GET data` requests are best
+  effort; real-time state comes from the pushes. That is why the page fills in a
+  second or two after it connects rather than on the first response.
+
 
 ## Node model
 
@@ -373,15 +428,14 @@ consistency with the original analysis.
 5. **Fixture timestamps are malformed in the shipped data**
    (`"2014-07-1116:04:27Z"` — missing space). Ship data quirk, not a client
    bug.
-6. **Four-digit pairing (E-P3) — mechanics live-proven, the final handshake still
-   needs a real tablet code.** Live-verified against the real server: pre-auth
-   in-band registration, SASL auth, bind, joining `shared`, and the code message
-   being accepted (echoed by the MUC). What is *not* yet observed is the
-   installation's `<presence type="subscribe">` (E-M5), because that requires a
-   code that is actually armed on the wall screen. Until then the pairing path is
-   wired per the binary but unconfirmed end-to-end. Diagnostics: `python3
-   esmart.py pair <code> --verbose` prints every stanza and reports
-   `pairing not confirmed: nobody subscribed to ...` if the handshake stalls.
+6. **Four-digit pairing (E-P3) -- RESOLVED 2026-10-17.** A real tablet code
+   (8546) completed the whole handshake end to end: registration, auth, bind,
+   `shared`, the code message, the installation's `<presence type="subscribe">`
+   (E-M5) and the house room with 11 live nodes. The earlier "needs a real
+   tablet code" caveat is closed. Control is verified too: `POST
+   /api/node/393/off` and `/on` both change the real light and the master
+   pushes the new state back into the room.
+
 
 ## Provenance
 

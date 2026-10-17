@@ -96,6 +96,7 @@ HomeKit needs the iPhone and the bridge on the same Wi-Fi network (mDNS).
 | stop | double-click **Stop eSMART**, or `python3 esmart.py stop` |
 | logs | `.esmart-run/bridge.log`, `.esmart-run/homekit.log` |
 | status | `python3 esmart.py check` (a diagnostic table) |
+| start at every login | `python3 esmart.py autostart on` (off: `autostart off`) |
 | terminal instead | `python3 esmart.py` — same as Start |
 
 ### Troubleshooting
