@@ -659,13 +659,23 @@ class EsmartXMPP:
 
     # -- presence / rooms -------------------------------------------------
     def go_online(self, room_name=None, *, join_shared=True):
-        """Mirror -[AppDelegate goOnline] (E-M3): send bare presence, then join
-        the stored RoomName, then always also the fixed 'shared' room (E-M1)."""
+        """Mirror -[AppDelegate goOnline] (E-M3): bare presence, then join the
+        stored RoomName, then always also the fixed 'shared' room (E-M1).
+
+        The house room is the one pairing discovered (E-M5); `shared` is only a
+        second, fixed room.  Joining both must not clobber which one we talk to,
+        so the house room is kept separately from `self.room`.
+        """
+        target = room_name or self.room_name or self.room or "shared"
         self._send("<presence/>")
         self._await(("presence", "iq", "message"), 6)
-        self.join_room(room_name or self.room_name or "shared")
+        self.join_room(target)
         if join_shared and self.room_name != "shared":
             self.join_room("shared")
+        # join_room() sets self.room to the *last* room joined, which is the
+        # wrong one here -- restore the house room so send_esmart talks to it.
+        self.room = room_jid(target, self.domain)
+        self.room_name = target
         return self.room
 
     def join_room(self, name: str):

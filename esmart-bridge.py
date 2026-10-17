@@ -38,6 +38,7 @@ import http.server
 import json
 import os
 import re
+import socket
 import socketserver
 import sys
 import threading
@@ -81,6 +82,23 @@ def load_env():
 # How often to re-request node state from the master (seconds).  The master
 # pushes changes into the room on its own; this is only a safety net.
 POLL_SECS = int(os.getenv("ESMART_POLL_SECS", "30"))
+DEFAULT_PIN = "12345678"
+
+
+def gateway_ip() -> str:
+    """LAN address of this machine, or "" if there is no route.
+
+    The bridge listens on 127.0.0.1 only; the page needs the real address to
+    tell the user what to type on a phone or another machine.
+    """
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 80))       # no packet is sent by UDP connect
+        return s.getsockname()[0]
+    except OSError:
+        return ""
+    finally:
+        s.close()
 
 
 class BridgeState:
@@ -101,10 +119,68 @@ class BridgeState:
         self.last_error: str | None = None
         self.last_sent: dict | None = None
         self.ready = False
+        self.started = time.time()
+        self._connecting = False
         self._listener_running = False
 
-    def is_configured(self) -> bool:
+    def reload_env(self) -> bool:
+        """Re-read .esmart.env into this state. Returns True once configured.
+
+        Pairing writes the file while we are already running: /pair runs in this
+        process, but `esmart.py pair` is a separate one.  Without this, a bridge
+        started before pairing keeps reporting configured=false forever and
+        `esmart.py start` waits the whole --pair-timeout on an already-paired
+        house.
+        """
+        if not self.dry_run:
+            load_env()
+        self.jid = self.jid or os.getenv("ESMART_JID", "").strip()
+        self.password = self.password or os.getenv("ESMART_PASSWORD", "").strip()
+        if self.room in ("", "shared"):
+            self.room = os.getenv("ESMART_ROOM", "").strip() or self.room
         return bool(self.jid and self.password)
+
+    def is_configured(self) -> bool:
+        return bool(self.jid and self.password) or self.reload_env()
+
+    def kick(self):
+        """Start connecting in the background if we are configured but not online.
+
+        Connecting means a full TCP+STARTTLS+SASL+bind+two room joins, which is
+        far too slow to do inside an HTTP handler. The first page load therefore
+        gets an empty node list and the next one gets the devices.
+        """
+        if self.dry_run or self._connecting or not self.is_configured():
+            return
+        if self.client and not self.client._eof:
+            return
+        self._connecting = True
+
+        def _go():
+            try:
+                self.ensure_client()
+            except Exception as e:
+                self.last_error = "connect: %s" % e
+            finally:
+                self._connecting = False
+
+        threading.Thread(target=_go, daemon=True).start()
+
+    def homekit_running(self) -> bool:
+        """Whether the HomeKit accessory process is alive (.esmart-run/homekit.pid)."""
+        pidfile = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                               ".esmart-run", "homekit.pid")
+        try:
+            pid = int(open(pidfile).read().strip() or 0)
+        except (OSError, ValueError):
+            return False
+        if pid <= 0:
+            return False
+        try:
+            os.kill(pid, 0)
+        except OSError:
+            return False
+        return True
 
     def ensure_client(self) -> EsmartXMPP | None:
         if self.dry_run:
@@ -232,8 +308,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if p == "/pair":
             return self._send_pair_page()
         if p == "/api/status":
+            BRIDGE.kick()
             return self._send_json({
                 "configured": BRIDGE.is_configured(),
+                "connecting": BRIDGE._connecting,
+                "online": bool(BRIDGE.client and not BRIDGE.client._eof),
                 "dry_run": BRIDGE.dry_run,
                 "jid": BRIDGE.jid,
                 "room": BRIDGE.room,
@@ -241,8 +320,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 "known_nodes": len(BRIDGE.nodes),
                 "last_error": BRIDGE.last_error,
                 "last_sent": BRIDGE.last_sent,
+                "gateway": gateway_ip(),
+                "homekit_running": BRIDGE.homekit_running(),
+                "pin": os.getenv("ESMART_HOMEKIT_PIN", DEFAULT_PIN),
             })
         if p == "/api/nodes":
+            BRIDGE.kick()
             # Merge static nodes with latest observed state
             out = []
             for nid, n in sorted(BRIDGE.nodes.items()):
@@ -350,9 +433,41 @@ class Handler(http.server.BaseHTTPRequestHandler):
         except Exception as e:
             self._send_json({"error": str(e), "type": type(e).__name__}, 500)
 
+    @staticmethod
+    def _pair_module():
+        """esmart-pair.py has a hyphen in its name, so it must be loaded by path."""
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "esmart_pair", os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                        "esmart-pair.py"))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    def _finish_pairing(self, mod, jid_full, password, room, code, reply):
+        """Persist a finished pairing and adopt it in this process (E-M5)."""
+        mod.save_env(ENV_CANDIDATES[0], jid_full, password, room, code)
+        with BRIDGE.client_lock:
+            if BRIDGE.client:
+                try:
+                    BRIDGE.client.close()
+                except Exception:
+                    pass
+            BRIDGE.client = None
+        BRIDGE.jid = jid_full
+        BRIDGE.password = password
+        BRIDGE.room = room
+        BRIDGE.nodes = {}
+        BRIDGE.states = {}
+        BRIDGE.last_error = None
+        BRIDGE.kick()
+        return {"status": "paired", "jid": jid_full, "room": room, "reply": reply}
+
     def _handle_web_pair(self, code: str):
-        # Run esmart-pair logic in-process
+        # 16-digit flow: the cloud POST is what arms the account (E-P1/E-P2),
+        # then the central confirms the same way as the 4-digit flow (E-M5).
         from esmart_core import make_jid, make_password
+        mod = self._pair_module()
         part, local, jid_full = make_jid()
         password = make_password()
         import urllib.request, ssl
@@ -374,28 +489,32 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 "error": "Cloud accepted the hash, but the 16-digit code was rejected. "
                          "Make sure the pairing screen is open on your tablet and try again."
             }, 400)
-        # Register + save env (esmart-pair.py has a hyphen, load it by path)
-        import importlib.util
-        spec = importlib.util.spec_from_file_location(
-            "esmart_pair", os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                        "esmart-pair.py"))
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
-        mod.save_env(ENV_CANDIDATES[0], jid_full, password, "shared", code)
-        BRIDGE.jid = jid_full
-        BRIDGE.password = password
-        BRIDGE.room = "shared"
-        return self._send_json({"status": "paired", "jid": jid_full, "reply": reply})
+        try:
+            reg = EsmartXMPP(jid_full, password, host=XMPPHOST, port=XMPPPORT,
+                             insecure=BRIDGE.insecure)
+            try:
+                reg.register_new_account(local, password)
+            except EsmartError as e:
+                # the cloud may already have created it during the POST
+                BRIDGE.last_error = "registration: %s" % e
+            finally:
+                reg.close()
+            room = mod.discover_paired_room(jid_full, password,
+                                            insecure=BRIDGE.insecure)
+        except EsmartError as e:
+            return self._send_json({"error": "pairing failed: %s" % e}, 502)
+        if not room:
+            return self._send_json(
+                {"error": "the cloud accepted the code but the installation never "
+                          "accepted us -- reopen the pairing screen for a fresh "
+                          "code and try again right away"}, 502)
+        return self._send_json(
+            self._finish_pairing(mod, jid_full, password, room, code, reply))
 
     def _handle_web_pair_four(self, code: str):
         """eSMART-Touch pairing: no cloud POST, just the XMPP code message (E-P3)."""
-        import importlib.util
         from esmart_core import make_jid, make_password
-        spec = importlib.util.spec_from_file_location(
-            "esmart_pair", os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                        "esmart-pair.py"))
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
+        mod = self._pair_module()
         part, local, jid_full = make_jid()
         password = make_password()
         try:
@@ -408,12 +527,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 {"error": "the installation never accepted us -- press \"Add a "
                           "remote\" for a fresh code and try again right away "
                           "(it expires after about a minute)"}, 502)
-        mod.save_env(ENV_CANDIDATES[0], jid_full, password, room, code)
-        BRIDGE.jid = jid_full
-        BRIDGE.password = password
-        BRIDGE.room = room
-        return self._send_json({"status": "paired", "jid": jid_full,
-                                "room": room, "reply": "paired"})
+        return self._send_json(
+            self._finish_pairing(mod, jid_full, password, room, code, body))
 
     def _send_pair_page(self):
         html = """<!doctype html><html><head><meta charset="utf-8">
