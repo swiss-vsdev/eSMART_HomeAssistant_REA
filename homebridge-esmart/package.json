@@ -19,9 +19,7 @@
   "scripts": {
     "test": "node test/esmart-map.test.js"
   },
-  "dependencies": {},
-  "optionalDependencies": {
+  "dependencies": {
     "hap-nodejs": "^0.14.3"
-  },
-  "devDependencies": {}
+  }
 }
