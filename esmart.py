@@ -335,7 +335,7 @@ def autostart_plist(repo):
         '  </array>\n'
         '  <key>WorkingDirectory</key><string>%s</string>\n'
         '  <key>RunAtLoad</key><true/>\n'
-        '  <key>KeepAlive</key><true/>\n'
+        '  <key>KeepAlive</key><false/>\n'
         '  <key>StandardOutPath</key><string>%s/bridge.log</string>\n'
         '  <key>StandardErrorPath</key><string>%s/bridge.log</string>\n'
         '</dict>\n'
@@ -609,8 +609,6 @@ def main(argv=None):
     p.add_argument("--port", type=int, help="HTTP port (default 8090, auto-shifts if busy)")
     p.add_argument("--host", help="HTTP bind address (default 127.0.0.1)")
     p.add_argument("--no-open", action="store_true", help="do not open a browser")
-    p.add_argument("--no-pair-wait", action="store_true",
-                   help="do not block waiting for pairing (for launchd / systemd)")
     p.add_argument("--no-pair-wait", action="store_true",
                    help="do not block waiting for pairing (for launchd / systemd)")
     p.add_argument("--no-homekit", action="store_true", help="skip the HomeKit bridge")

@@ -1,53 +1,96 @@
-<html lang="fr">
+<!doctype html>
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>eSMART – HTTP→XMPP lamp bridge</title>
+<title>eSMART</title>
 <style>
- body{font-family:-apple-system,system-ui,sans-serif;background:#f7f8fa;margin:0;padding:24px;color:#1d1d1d}
- h1{font-size:1.3em;margin-top:0}
- label{font-weight:600;font-size:.9em}
- select,button,option,input{margin:.4em 0;font-size:1em;padding:.5em 1em;border:1px solid #bbb;border-radius:6px}
- button{background:#007aff;color:#fff;border:none;cursor:pointer;width:100%;margin-top:1em;padding:12px;font-weight:600}
- button:disabled{background:#999;cursor:default}
- .row{border:1px solid #e0e0e0;border-radius:10px;padding:14px 16px;margin-bottom:14px;background:#fff}
- .id{width:8ch} .tag{color:#666;font-size:.8em}
- .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
+ body{font-family:-apple-system,system-ui,sans-serif;background:#f7f8fa;margin:0;padding:20px;color:#1d1d1d;max-width:760px;margin-inline:auto}
+ h1{font-size:1.3em;margin:0 0 14px}
+ .card{border:1px solid #e0e0e0;border-radius:12px;padding:14px 16px;margin-bottom:14px;background:#fff}
+ .card h2{font-size:.95em;margin:0 0 8px}
+ .tag{color:#666;font-size:.8em}
+ .ok{border-color:#a8dcb5;background:#f3fbf5}
+ .warn{border-color:#e8d49a;background:#fdf9ee}
+ .err{border-color:#e5b3bb;background:#fdf3f4}
+ ol{margin:6px 0 0;padding-left:20px;font-size:.9em}
+ code{background:#eef0f3;padding:1px 5px;border-radius:4px;font-size:.95em}
+ .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
+ .dev{border:1px solid #e0e0e0;border-radius:10px;padding:10px 12px;background:#fff}
+ .dev .n{font-weight:600;font-size:.95em}
+ .btns{display:flex;gap:6px;margin-top:8px}
+ button{flex:1;font-size:.9em;padding:8px;border:none;border-radius:8px;background:#007aff;color:#fff;cursor:pointer;font-weight:600}
+ button.off{background:#8e8e93}
+ button:disabled{background:#c7c7cc;cursor:default}
+ .on{color:#0a7d2b;font-size:.8em} .off2{color:#8e8e93;font-size:.8em}
 </style>
 </head>
 <body>
-<h1>eSMART → lampes</h1>
-<div class="row">
-  <div class="tag">Backend HTTP</div>
-  <select id="host"><option value="http://127.0.0.1:8090">http://127.0.0.1:8090</option></select>
-</div>
-<div class="row">
-  <div class="tag">ID node (ex. 36)</div><input id="nid" class="id" type="number" min="1" value="36">
-</div>
-<div class="row">
-  <div class="tag">État</div>
-  <div class="grid">
-    <button id="on" onclick="set('on')">ON</button>
-    <button id="off" onclick="set('off')">OFF</button>
-  </div>
-</div>
-<pre id="out" style="background:#202024;color:#eee;padding:12px;border-radius:8px;font-size:.8em;min-height:60px;overflow:auto"></pre>
+<h1>eSMART</h1>
+<div id="status" class="card">Loading…</div>
+<div id="devices"></div>
 <script>
-const out=document.getElementById('out');
-function log(s){ out.textContent += s+'\n'; out.scrollTop=out.scrollHeight; }
-async function set(onoff){
-  const btn=document.getElementById(onoff);
-  const host=document.getElementById('host').value;
-  const id=document.getElementById('nid').value;
-  btn.disabled=true; btn.textContent='…envoi…';
-  try{
-    const r=await fetch(host+'/api/node/'+id+'/'+onoff, {method:'POST'});
-    const txt=await r.text();
-    log('['+new Date().toLocaleString()+'] '+id+' -> '+onoff+'  HTTP '+r.status);
-    if(txt) log(txt);
-  }catch(e){ log('ERR '+e); }
-  btn.textContent=onoff==='on'?'ON':'OFF'; btn.disabled=false;
+const st=document.getElementById('status'), dev=document.getElementById('devices');
+let base = location.origin;               // same host/port the page came from
+
+function esc(s){return String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+function renderStatus(s){
+  if(!s){ st.className='card err'; st.textContent='The bridge is not answering. Start it with "Start eSMART".'; return; }
+  if(!s.configured){
+    st.className='card warn';
+    st.innerHTML='<h2>Not paired yet</h2><p>Open your tablet\'s pairing screen and enter the code here:<br>'
+      +'<a href="/pair"><b>'+esc(base)+'/pair</b></a></p>';
+    return;
+  }
+  let html='<h2>Paired &mdash; '+esc(s.room)+'</h2>';
+  if(!s.online)      html+='<p class="tag">Connecting to the eSMART cloud…</p>';
+  else if(!s.known_nodes) html+='<p class="tag">Connected. Asking the central for its devices…</p>';
+  if(!s.homekit_running){
+    st.className='card warn';
+    html+='<p class="tag">Apple Home is not published (needs Node.js, see README).</p>';
+  } else {
+    st.className='card ok';
+    html+='<h2 style="margin-top:10px">Add to Apple Home</h2><ol>'
+      +'<li>On iPhone/iPad open the <b>Home</b> app &rarr; <b>+</b> &rarr; <b>Add Accessory</b></li>'
+      +'<li>Choose <b>I Don\'t Have a Code</b></li>'
+      +'<li>Pick <b>eSMART Bridge</b> and enter the code <code>'+esc(s.pin)+'</code></li></ol>'
+      +'<p class="tag">Already added? The devices appear in your Home automatically.</p>';
+  }
+  if(s.gateway) html+='<p class="tag">This page from another device: <b>http://'+esc(s.gateway)+':'+location.port+'/</b> '
+    +'(iPhone control works through the Home app, no URL needed).</p>';
+  if(s.last_error) html+='<p class="tag">Last error: '+esc(s.last_error)+'</p>';
+  st.innerHTML=html;
 }
+
+function renderDevices(list){
+  if(!list.length){ dev.innerHTML='<div class="card"><span class="tag">No devices yet.</span></div>'; return; }
+  const on = d => (d.state && d.state.onoff==='on') || (d.state && (d.state.deviceOnOff||'').toLowerCase()==='on');
+  dev.innerHTML='<div class="grid">'+list.map(d=>{
+    const live=on(d);
+    const extra = d.state && d.state.temperature!=null ? ' &middot; '+d.state.temperature+'\u00b0C' : '';
+    const ctrl = d.kind==='OnOff' || d.kind==='Dimmer';
+    return '<div class="dev"><div class="n">'+esc(d.name)+'</div>'
+      +'<div class="'+(live?'on':'off2')+'">'+(live?'on':'off')+esc(extra)+'</div>'
+      +(ctrl?'<div class="btns"><button onclick="go('+d.id+',\'on\')">On</button>'
+             +'<button class="off" onclick="go('+d.id+',\'off\')">Off</button></div>':'')
+      +'</div>';
+  }).join('')+'</div>';
+}
+
+async function go(id, onoff){
+  document.querySelectorAll('button').forEach(b=>b.disabled=true);
+  try{ await fetch(base+'/api/node/'+id+'/'+onoff, {method:'POST'}); }catch(e){}
+  setTimeout(refresh, 700);
+}
+
+async function refresh(){
+  let s=null, n=[];
+  try{ s = await (await fetch(base+'/api/status')).json(); }catch(e){}
+  try{ n = await (await fetch(base+'/api/nodes')).json(); }catch(e){}
+  renderStatus(s); renderDevices(Array.isArray(n)?n:[]);
+}
+refresh(); setInterval(refresh, 5000);
 </script>
 </body>
 </html>
