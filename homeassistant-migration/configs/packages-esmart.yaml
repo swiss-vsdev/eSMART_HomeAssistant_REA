@@ -1,0 +1,212 @@
+# eSMART bridge integration for Home Assistant
+# Generated for the 11-device layout discovered on 2026-10-25
+#
+# Architecture:
+#   esmart-bridge.py (port 8090, XMPP) → rest sensor polls /api/nodes
+#                                    → template sensors extract per-device state
+#                                    → switch/climate entities wrap them
+#                                    → rest_command sends writes back
+#
+# Every entity is driven by the single `sensor.esmart_nodes_raw` poll.
+# No writes go through HA unless a switch or climate is toggled.
+
+rest:
+  - resource: http://127.0.0.1:8090/api/nodes
+    scan_interval: 5
+    method: GET
+    sensor:
+      - name: "eSMART nodes raw"
+        unique_id: esmart_nodes_raw
+        value_template: "{{ value_json | length }}"
+        json_attributes:
+          - "{{ value_json }}"
+        json_attributes_path: "$"
+
+rest_command:
+  esmart_set_on:
+    url: "http://127.0.0.1:8090/api/node/{{ id }}/on"
+    method: POST
+    timeout: 10
+  esmart_set_off:
+    url: "http://127.0.0.1:8090/api/node/{{ id }}/off"
+    method: POST
+    timeout: 10
+  esmart_set_setpoint:
+    url: "http://127.0.0.1:8090/api/thermo/{{ id }}/{{ setpoint }}"
+    method: POST
+    timeout: 10
+  esmart_set_setpoint_mode:
+    url: "http://127.0.0.1:8090/api/thermo/{{ id }}/{{ setpoint }}/{{ mode }}"
+    method: POST
+    timeout: 10
+
+template:
+  # ========== Per-device state sensors ==========
+  - sensor:
+      - name: "eSMART state 1"      # Bad 1 (Temp)
+        unique_id: esmart_state_1
+        state: "{{ (state_attr('sensor.esmart_nodes_raw','esmart_nodes_raw') or []) | selectattr('id','eq',1) | map(attribute='state.temperature') | first | default('unknown') }}"
+      - name: "eSMART setpoint 1"
+        unique_id: esmart_setpoint_1
+        state: "{{ (state_attr('sensor.esmart_nodes_raw','esmart_nodes_raw') or []) | selectattr('id','eq',1) | map(attribute='state.setpoint') | first | default(20) }}"
+
+      - name: "eSMART state 13"     # Licht 1 (OnOff)
+        unique_id: esmart_state_13
+        state: "{{ (state_attr('sensor.esmart_nodes_raw','esmart_nodes_raw') or []) | selectattr('id','eq',13) | map(attribute='state.onoff') | first | default('off') }}"
+      - name: "eSMART state 14"     # Balkon
+        unique_id: esmart_state_14
+        state: "{{ (state_attr('sensor.esmart_nodes_raw','esmart_nodes_raw') or []) | selectattr('id','eq',14) | map(attribute='state.onoff') | first | default('off') }}"
+      - name: "eSMART state 25"     # Zimmer 1 (Temp)
+        unique_id: esmart_state_25
+        state: "{{ (state_attr('sensor.esmart_nodes_raw','esmart_nodes_raw') or []) | selectattr('id','eq',25) | map(attribute='state.temperature') | first | default('unknown') }}"
+      - name: "eSMART setpoint 25"
+        unique_id: esmart_setpoint_25
+        state: "{{ (state_attr('sensor.esmart_nodes_raw','esmart_nodes_raw') or []) | selectattr('id','eq',25) | map(attribute='state.setpoint') | first | default(20) }}"
+      - name: "eSMART state 26"     # Wohnen (Temp)
+        unique_id: esmart_state_26
+        state: "{{ (state_attr('sensor.esmart_nodes_raw','esmart_nodes_raw') or []) | selectattr('id','eq',26) | map(attribute='state.temperature') | first | default('unknown') }}"
+      - name: "eSMART setpoint 26"
+        unique_id: esmart_setpoint_26
+        state: "{{ (state_attr('sensor.esmart_nodes_raw','esmart_nodes_raw') or []) | selectattr('id','eq',26) | map(attribute='state.setpoint') | first | default(20) }}"
+      - name: "eSMART state 385"    # korridor
+        unique_id: esmart_state_385
+        state: "{{ (state_attr('sensor.esmart_nodes_raw','esmart_nodes_raw') or []) | selectattr('id','eq',385) | map(attribute='state.onoff') | first | default('off') }}"
+      - name: "eSMART state 386"    # Küche
+        unique_id: esmart_state_386
+        state: "{{ (state_attr('sensor.esmart_nodes_raw','esmart_nodes_raw') or []) | selectattr('id','eq',386) | map(attribute='state.onoff') | first | default('off') }}"
+      - name: "eSMART state 393"    # Bad
+        unique_id: esmart_state_393
+        state: "{{ (state_attr('sensor.esmart_nodes_raw','esmart_nodes_raw') or []) | selectattr('id','eq',393) | map(attribute='state.onoff') | first | default('off') }}"
+      - name: "eSMART state 394"    # Schlafzimmer
+        unique_id: esmart_state_394
+        state: "{{ (state_attr('sensor.esmart_nodes_raw','esmart_nodes_raw') or []) | selectattr('id','eq',394) | map(attribute='state.onoff') | first | default('off') }}"
+      - name: "eSMART state 401"    # wohnzimmer
+        unique_id: esmart_state_401
+        state: "{{ (state_attr('sensor.esmart_nodes_raw','esmart_nodes_raw') or []) | selectattr('id','eq',401) | map(attribute='state.onoff') | first | default('off') }}"
+      - name: "eSMART state 402"    # Table
+        unique_id: esmart_state_402
+        state: "{{ (state_attr('sensor.esmart_nodes_raw','esmart_nodes_raw') or []) | selectattr('id','eq',402) | map(attribute='state.onoff') | first | default('off') }}"
+
+  # ========== Switch entities (8 lights) ==========
+  - switch:
+      - name: "eSMART Licht 1"
+        unique_id: esmart_licht_1
+        state: "{{ is_state('sensor.esmart_state_13','on') }}"
+        turn_on:  [{ service: rest_command.esmart_set_on,  data: { id: 13 } }]
+        turn_off: [{ service: rest_command.esmart_set_off, data: { id: 13 } }]
+      - name: "eSMART Balkon"
+        unique_id: esmart_balkon
+        state: "{{ is_state('sensor.esmart_state_14','on') }}"
+        turn_on:  [{ service: rest_command.esmart_set_on,  data: { id: 14 } }]
+        turn_off: [{ service: rest_command.esmart_set_off, data: { id: 14 } }]
+      - name: "eSMART Korridor"
+        unique_id: esmart_korridor
+        state: "{{ is_state('sensor.esmart_state_385','on') }}"
+        turn_on:  [{ service: rest_command.esmart_set_on,  data: { id: 385 } }]
+        turn_off: [{ service: rest_command.esmart_set_off, data: { id: 385 } }]
+      - name: "eSMART Küche"
+        unique_id: esmart_kuche
+        state: "{{ is_state('sensor.esmart_state_386','on') }}"
+        turn_on:  [{ service: rest_command.esmart_set_on,  data: { id: 386 } }]
+        turn_off: [{ service: rest_command.esmart_set_off, data: { id: 386 } }]
+      - name: "eSMART Bad"
+        unique_id: esmart_bad
+        state: "{{ is_state('sensor.esmart_state_393','on') }}"
+        turn_on:  [{ service: rest_command.esmart_set_on,  data: { id: 393 } }]
+        turn_off: [{ service: rest_command.esmart_set_off, data: { id: 393 } }]
+      - name: "eSMART Schlafzimmer"
+        unique_id: esmart_schlafzimmer
+        state: "{{ is_state('sensor.esmart_state_394','on') }}"
+        turn_on:  [{ service: rest_command.esmart_set_on,  data: { id: 394 } }]
+        turn_off: [{ service: rest_command.esmart_set_off, data: { id: 394 } }]
+      - name: "eSMART Wohnzimmer"
+        unique_id: esmart_wohnzimmer
+        state: "{{ is_state('sensor.esmart_state_401','on') }}"
+        turn_on:  [{ service: rest_command.esmart_set_on,  data: { id: 401 } }]
+        turn_off: [{ service: rest_command.esmart_set_off, data: { id: 401 } }]
+      - name: "eSMART Table"
+        unique_id: esmart_table
+        state: "{{ is_state('sensor.esmart_state_402','on') }}"
+        turn_on:  [{ service: rest_command.esmart_set_on,  data: { id: 402 } }]
+        turn_off: [{ service: rest_command.esmart_set_off, data: { id: 402 } }]
+
+  # ========== Climate entities (3 thermostats) ==========
+  - climate:
+      - name: "eSMART Bad 1"
+        unique_id: esmart_bad_1
+        current_temperature_template: "{{ states('sensor.esmart_state_1') | float(20) }}"
+        target_temperature_template:  "{{ states('sensor.esmart_setpoint_1') | float(20) }}"
+        action_template: >
+          {% if states('sensor.esmart_state_1')|float(20) < states('sensor.esmart_setpoint_1')|float(20) %}
+            heating
+          {% else %}
+            idle
+          {% endif %}
+        hvac_mode: heat
+        hvac_modes: [heat, 'off']
+        min_temp: 5
+        max_temp: 35
+        target_temp_step: 1
+        set_temperature:
+          - service: rest_command.esmart_set_setpoint
+            data:
+              id: 1
+              setpoint: "{{ temperature | int }}"
+        set_hvac_mode:
+          - service: rest_command.esmart_set_setpoint_mode
+            data:
+              id: 1
+              setpoint: "{{ target_temperature | int }}"
+              mode: "{{ hvac_mode }}"
+      - name: "eSMART Zimmer 1"
+        unique_id: esmart_zimmer_1
+        current_temperature_template: "{{ states('sensor.esmart_state_25') | float(20) }}"
+        target_temperature_template:  "{{ states('sensor.esmart_setpoint_25') | float(20) }}"
+        action_template: >
+          {% if states('sensor.esmart_state_25')|float(20) < states('sensor.esmart_setpoint_25')|float(20) %}
+            heating
+          {% else %}
+            idle
+          {% endif %}
+        hvac_mode: heat
+        hvac_modes: [heat, 'off']
+        min_temp: 5
+        max_temp: 35
+        target_temp_step: 1
+        set_temperature:
+          - service: rest_command.esmart_set_setpoint
+            data:
+              id: 25
+              setpoint: "{{ temperature | int }}"
+        set_hvac_mode:
+          - service: rest_command.esmart_set_setpoint_mode
+            data:
+              id: 25
+              setpoint: "{{ target_temperature | int }}"
+              mode: "{{ hvac_mode }}"
+      - name: "eSMART Wohnen"
+        unique_id: esmart_wohnen
+        current_temperature_template: "{{ states('sensor.esmart_state_26') | float(20) }}"
+        target_temperature_template:  "{{ states('sensor.esmart_setpoint_26') | float(20) }}"
+        action_template: >
+          {% if states('sensor.esmart_state_26')|float(20) < states('sensor.esmart_setpoint_26')|float(20) %}
+            heating
+          {% else %}
+            idle
+          {% endif %}
+        hvac_mode: heat
+        hvac_modes: [heat, 'off']
+        min_temp: 5
+        max_temp: 35
+        target_temp_step: 1
+        set_temperature:
+          - service: rest_command.esmart_set_setpoint
+            data:
+              id: 26
+              setpoint: "{{ temperature | int }}"
+        set_hvac_mode:
+          - service: rest_command.esmart_set_setpoint_mode
+            data:
+              id: 26
+              setpoint: "{{ target_temperature | int }}"
+              mode: "{{ hvac_mode }}"

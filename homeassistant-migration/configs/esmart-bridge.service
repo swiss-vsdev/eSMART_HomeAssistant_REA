@@ -1,0 +1,27 @@
+[Unit]
+Description=eSMART XMPP bridge (HTTP + XMPP client)
+Documentation=https://github.com/swiss-vsdev/eSMART_homekit_rea
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=dietpi
+Group=dietpi
+WorkingDirectory=/opt/esmart
+Environment=HOME=/home/dietpi
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 -u /opt/esmart/esmart-bridge.py --port 8090 --host 0.0.0.0
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=esmart-bridge
+
+# Hardening (safe — the bridge only needs to write .esmart-run/ and read .esmart.env)
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

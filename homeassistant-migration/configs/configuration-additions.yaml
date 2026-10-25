@@ -1,0 +1,11 @@
+# Snippet to append to /mnt/dietpi_userdata/homeassistant/configuration.yaml
+# if it doesn't already contain these blocks. The plan's Phase 2 and Phase 3
+# actions check with `grep -q` before appending, so this file is a reference.
+
+homeassistant:
+  packages: !include_dir_named packages
+
+homekit:
+  - name: "Home Assistant Bridge"
+    port: 21063
+    filter: !include homekit.yaml

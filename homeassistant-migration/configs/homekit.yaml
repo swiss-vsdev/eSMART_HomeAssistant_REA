@@ -1,0 +1,39 @@
+# HomeKit Bridge filter — exposes only the eSMART entities
+# Referenced from configuration.yaml `homekit: - filter: !include homekit.yaml`
+
+include_entities:
+  - switch.esmart_licht_1
+  - switch.esmart_balkon
+  - switch.esmart_korridor
+  - switch.esmart_kuche
+  - switch.esmart_bad
+  - switch.esmart_schlafzimmer
+  - switch.esmart_wohnzimmer
+  - switch.esmart_table
+  - climate.esmart_bad_1
+  - climate.esmart_zimmer_1
+  - climate.esmart_wohnen
+
+entity_config:
+  switch.esmart_licht_1:
+    name: "Licht 1"
+  switch.esmart_balkon:
+    name: "Balkon"
+  switch.esmart_korridor:
+    name: "Korridor"
+  switch.esmart_kuche:
+    name: "Küche"
+  switch.esmart_bad:
+    name: "Bad"
+  switch.esmart_schlafzimmer:
+    name: "Schlafzimmer"
+  switch.esmart_wohnzimmer:
+    name: "Wohnzimmer"
+  switch.esmart_table:
+    name: "Table"
+  climate.esmart_bad_1:
+    name: "Bad 1 (Thermostat)"
+  climate.esmart_zimmer_1:
+    name: "Zimmer 1 (Thermostat)"
+  climate.esmart_wohnen:
+    name: "Wohnen (Thermostat)"
