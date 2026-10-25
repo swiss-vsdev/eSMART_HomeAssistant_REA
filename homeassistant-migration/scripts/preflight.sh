@@ -53,7 +53,7 @@ fi
 check "/opt/esmart exists"                 test -d /opt/esmart
 check "/opt/esmart/esmart-bridge.py exists" test -f /opt/esmart/esmart-bridge.py
 check "/opt/esmart/.esmart.env exists"     test -f /opt/esmart/.esmart.env
-check ".esmart.env has JID"                bash -c 'grep -q "^ESMART_JID=" /opt/esmart/.esmart.env'
+check ".esmart.env has JID"                bash -c 'grep -qE "^[[:space:]]*(export[[:space:]]+)?ESMART_JID=" /opt/esmart/.esmart.env'
 check "esmart-bridge.py parses"            bash -c 'python3 -m py_compile /opt/esmart/esmart-bridge.py'
 
 # 5. Port availability (fresh install = free; already-installed = occupied by HA itself)
