@@ -1,10 +1,16 @@
 # eSMART → Home Assistant Migration
 
-This migration moves your eSMART devices from the custom Node.js HomeKit bridge to Home Assistant with native HomeKit support.
+This migration moves your eSMART devices into **Home Assistant**. After
+migration, you use Home Assistant's official integrations for Apple Home
+(HomeKit), Google Home, Alexa, voice assistants, automations, and dashboards.
+
+> **Note**: HomeKit is not configured automatically. After migration, you
+> enable it yourself in the Home Assistant UI — one click, fully official.
+> See [Exposing to Apple Home](#exposing-to-apple-home) below.
 
 ## 🚀 Quick Start (One-liner)
 
-**Recommended**: Run this on your Raspberry Pi to update and start the migration automatically:
+**Recommended**: Run this on your Raspberry Pi:
 
 ```bash
 ssh dietpi@192.168.1.126
@@ -28,16 +34,9 @@ The bootstrap script will:
 ### Method 1: If eSMART is already installed on your Pi
 
 ```bash
-# SSH to your Pi
 ssh dietpi@192.168.1.126
-
-# Navigate to your eSMART installation
 cd /opt/esmart
-
-# Update to latest version with migration scripts
 git pull origin main
-
-# Run the migration
 cd homeassistant-migration
 ./run-migration.sh
 ```
@@ -45,39 +44,52 @@ cd homeassistant-migration
 ### Method 2: Clone fresh
 
 ```bash
-# SSH to your Pi
 ssh dietpi@192.168.1.126
-
-# Clone the repository
 cd /opt
 git clone https://github.com/swiss-vsdev/eSMART_homekit_rea.git esmart
 cd esmart/homeassistant-migration
-
-# Run the migration
 ./run-migration.sh
 ```
 
 ## What the migration does
 
-1. **Phase 0**: Creates backup of current eSMART setup
-2. **Phase 1**: Installs Home Assistant Core
-3. **Phase 2**: Creates Home Assistant package with all 11 eSMART devices
-4. **Phase 3**: Sets up HomeKit Bridge for Apple Home app
-5. **Phase 4**: Optional Google Home integration
-6. **Phase 5**: Proper systemd supervision + cold-boot test
-7. **Phase 6**: Removes old Node.js bridge
-8. **Phase 7**: End-to-end verification
+1. **Phase 0**: Backup current eSMART setup
+2. **Phase 1**: Install Home Assistant Core
+3. **Phase 2**: Add eSMART bridge package (11 devices → 8 switches + 3 thermostats)
+4. **Phase 3**: Google Home (optional, can skip)
+5. **Phase 4**: Set up systemd supervision + cold-boot test (auto-reboot)
+6. **Phase 5**: Archive old Node.js HomeKit bridge
+7. **Phase 6**: End-to-end verification
 
 ## Before starting
 
 - Make sure eSMART is working on your Pi (`http://192.168.1.126:8090/`)
 - Have your eSMART credentials ready in `/opt/esmart/.esmart.env`
 - Ensure at least 3GB free space on `/mnt/dietpi_userdata`
+- Expect the process to take 1–2 hours (most of it waiting for HA to install
+  and for the onboarding step)
+
+## Exposing to Apple Home
+
+After migration completes, use Home Assistant's **official HomeKit
+integration** — no YAML files, no manual pairing:
+
+1. Open Home Assistant: http://192.168.1.126:8123
+2. Go to **Settings → Devices & Services**
+3. Click **Add Integration** → search **HomeKit Bridge**
+4. Choose **Bridge** type, domain `switch` + `climate` (or pick specific entities)
+5. Finish — Home Assistant shows a HomeKit setup code
+6. On iPhone/iPad: **Home app** → `+` → **Add Accessory** → scan the QR or
+   enter the code manually
+
+If you previously paired the old `eSMART Bridge` in the Home app, remove it
+first: **Home app → long-press accessory → Remove Accessory**.
 
 ## After migration
 
-- Your devices appear in both Apple Home and Home Assistant
+- Your devices appear in Home Assistant
 - Better reliability and automatic updates via Home Assistant
+- Apple Home, Google Home, Alexa all work through HA integrations
 - Old Node.js bridge removed (archived in `/opt/esmart-archive/`)
 - Full backup available in `/home/dietpi/esmart-migration-backup/`
 
@@ -86,12 +98,12 @@ cd esmart/homeassistant-migration
 - If migration fails, it automatically rolls back to previous state
 - Check logs: `journalctl -u esmart-bridge -f` and `journalctl -u home-assistant -f`
 - Manual rollback: `./scripts/rollback.sh N` where N is the failed phase
+- HomeKit not showing devices? Make sure you added the HomeKit Bridge integration and selected the eSMART entities
 
 ## Files created
 
 - `/opt/esmart/homeassistant-migration/` - Migration scripts and configs
 - `/mnt/dietpi_userdata/homeassistant/packages/esmart_bridge.yaml` - eSMART device definitions
-- `/mnt/dietpi_userdata/homeassistant/homekit.yaml` - HomeKit bridge config
 - `/etc/systemd/system/esmart-bridge.service` - Improved systemd service
 
 ## Revert migration

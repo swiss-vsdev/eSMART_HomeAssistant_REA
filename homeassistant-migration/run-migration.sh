@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # eSMART → Home Assistant Migration Runner
-# Run this after git pull on your Pi.
+# Run this on your Pi after git pull.
+# This script migrates eSMART devices to Home Assistant.
+# HomeKit setup is done manually via HA UI (Settings > HomeKit)
 
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -23,6 +25,10 @@ fi
 log "=== eSMART → Home Assistant Migration ==="
 log "Starting migration at $(date)"
 log "Script location: $SCRIPT_DIR"
+log ""
+log "Note: This migration sets up eSMART devices in Home Assistant."
+log "HomeKit exposure is done manually via HA UI after migration."
+log ""
 
 # Run preflight checks
 log "Running preflight checks..."
@@ -31,7 +37,7 @@ if ! "$SCRIPT_DIR/scripts/preflight.sh"; then
 fi
 
 # Execute phases
-for PHASE in {0..7}; do
+for PHASE in {0..6}; do
     log "=== Phase $PHASE: START ==="
     
     # Run phase actions
@@ -116,49 +122,24 @@ YAML
         
         # Wait for entities to appear
         log "Waiting for eSMART entities to appear in Home Assistant..."
-        TIMEOUT=120; ELAPSED=0
-        until curl -s -H "Authorization: Bearer $HA_TOKEN" \
-             http://127.0.0.1:8123/api/states/switch.esmart_kuche 2>/dev/null | grep -q "entity_id"; do
-          if [ $ELAPSED -ge $TIMEOUT ]; then 
-            error_exit "TIMEOUT: eSMART entities didn't appear"
-          fi
-          sleep 10; ELAPSED=$((ELAPSED + 10))
-        done
+        # Note: HA_TOKEN needs to be exported before running migration
+        if [ -z "${HA_TOKEN:-}" ]; then
+            log "Warning: HA_TOKEN not set. Cannot verify entities via API."
+            log "Verify manually in HA UI: Settings > Devices & Services"
+        else
+            TIMEOUT=120; ELAPSED=0
+            until curl -s -H "Authorization: Bearer $HA_TOKEN" \
+                 http://127.0.0.1:8123/api/states/switch.esmart_kuche 2>/dev/null | grep -q "entity_id"; do
+              if [ $ELAPSED -ge $TIMEOUT ]; then 
+                error_exit "TIMEOUT: eSMART entities didn't appear"
+              fi
+              sleep 10; ELAPSED=$((ELAPSED + 10))
+            done
+        fi
         log "eSMART entities loaded successfully!"
         ;;
     3)
-        # Phase 3: Publish to Apple Home via HA HomeKit Bridge
-        log "Setting up HomeKit Bridge..."
-        HA_CONFIG="/mnt/dietpi_userdata/homeassistant"
-        
-        # Copy HomeKit config
-        sudo cp "$SCRIPT_DIR/configs/homekit.yaml" "$HA_CONFIG/homekit.yaml"
-        
-        # Add to configuration.yaml
-        if ! grep -q "^homekit:" "$HA_CONFIG/configuration.yaml"; then
-          sudo tee -a "$HA_CONFIG/configuration.yaml" >/dev/null <<'YAML'
-
-homekit:
-  - name: "Home Assistant Bridge"
-    port: 21063
-    filter: !include homekit.yaml
-YAML
-        fi
-        
-        # Open firewall
-        sudo ufw allow 21063/tcp comment 'HA HomeKit Bridge' || true
-        sudo ufw allow 5353/udp >/dev/null 2>&1 || true
-        
-        # Restart HA
-        sudo systemctl restart home-assistant
-        sleep 30
-        
-        log "HomeKit Bridge configured. Setup URI should be available in HA UI."
-        log "Please remove any existing 'eSMART Bridge' from Apple Home, then continue..."
-        read -p "Press Enter to continue after removing old eSMART Bridge..."
-        ;;
-    4)
-        # Phase 4: Google Home (optional)
+        # Phase 3: Google Home (optional)
         log "Checking for Google Home integration..."
         HA_CONFIG="/mnt/dietpi_userdata/homeassistant"
         
@@ -166,18 +147,12 @@ YAML
             log "Google Assistant already configured, skipping setup."
         else
             log "Google Assistant integration not found."
-            read -p "Do you want to configure Google Home now? (y/N): " -n 1 -r
-            echo
-            if [[ $REPLY =~ ^[Yy]$ ]]; then
-                log "Please configure Google Home in HA UI: Settings → Google Assistant"
-                read -p "Press Enter when done..."
-            else
-                log "Skipping Google Home configuration."
-            fi
+            log "To enable Google Home: HA UI > Settings > Voice Assistants > Google Assistant"
+            read -p "Press Enter to continue..."
         fi
         ;;
-    5)
-        # Phase 5: Systemd supervision and cold-boot test
+    4)
+        # Phase 4: Systemd supervision and cold-boot test
         log "Setting up systemd supervision..."
         
         # Stop and remove old service
@@ -214,8 +189,8 @@ UNIT
         sleep 60
         log "Post-reboot verification..."
         ;;
-    6)
-        # Phase 6: Remove old Node.js HAP
+    5)
+        # Phase 5: Remove old Node.js HAP
         log "Removing old Node.js HomeKit bridge..."
         
         # Archive, don't delete
@@ -227,8 +202,8 @@ UNIT
         
         log "Old Node.js bridge archived to /opt/esmart-archive/"
         ;;
-    7)
-        # Phase 7: End-to-end verification
+    6)
+        # Phase 6: End-to-end verification
         log "Running end-to-end test..."
         if ! "$SCRIPT_DIR/scripts/e2e-test.sh"; then
             error_exit "End-to-end test failed. Migration incomplete."
@@ -256,7 +231,13 @@ log "Final system state:"
 echo "  esmart-bridge: $(systemctl is-active esmart-bridge)"
 echo "  home-assistant: $(systemctl is-active home-assistant)"
 echo "  nodes: $(curl -s http://127.0.0.1:8090/api/status 2>/dev/null | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("known_nodes",0))' 2>/dev/null || echo 'unknown')"
-echo "  HA entities: $(curl -s -H "Authorization: Bearer $HA_TOKEN" http://127.0.0.1:8123/api/states 2>/dev/null | python3 -c 'import json,sys; d=json.load(sys.stdin); print(len([s for s in d if s["entity_id"].startswith("switch.esmart_") or s["entity_id"].startswith("climate.esmart_")]))' 2>/dev/null || echo 'unknown')"
+echo ""
+log "Next steps:"
+log "1. Verify devices in Home Assistant: http://192.168.1.126:8123"
+log "2. To expose in Apple Home:"
+log "   - HA UI > Settings > Home Assistant > HomeKit"
+log "   - Enable HomeKit and select eSMART entities"
+log "   - Follow pairing instructions"
 log ""
 log "Backup available at: /home/dietpi/esmart-migration-backup/"
-log "You can now access your devices in Apple Home and Home Assistant!"
+log "You can now control your eSMART devices via Home Assistant!"

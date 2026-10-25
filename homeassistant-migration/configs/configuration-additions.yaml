@@ -1,11 +1,19 @@
-# Snippet to append to /mnt/dietpi_userdata/homeassistant/configuration.yaml
-# if it doesn't already contain these blocks. The plan's Phase 2 and Phase 3
-# actions check with `grep -q` before appending, so this file is a reference.
+# Reference snippets to merge into /mnt/dietpi_userdata/homeassistant/configuration.yaml
+#
+# Only the `homeassistant: packages:` block is added automatically by the
+# migration. The `homekit:` block below is OPTIONAL — use it only if you
+# prefer YAML-based HomeKit over the official HomeKit Bridge integration.
+#
+# Recommended path (post-migration):
+#   HA UI → Settings → Devices & Services → Add Integration → HomeKit Bridge
+#   Select switch + climate domains, or pick specific eSMART entities.
+#   HA shows a setup code you use in the Home app.
 
 homeassistant:
   packages: !include_dir_named packages
 
-homekit:
-  - name: "Home Assistant Bridge"
-    port: 21063
-    filter: !include homekit.yaml
+# --- OPTIONAL (not auto-applied) ---
+# homekit:
+#   - name: "Home Assistant Bridge"
+#     port: 21063
+#     filter: !include homekit.yaml

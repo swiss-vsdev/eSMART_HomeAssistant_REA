@@ -5,7 +5,7 @@
 set -u
 PHASE="${1:-}"
 if [ -z "$PHASE" ]; then
-  echo "usage: $0 N (0-7)"
+  echo "usage: $0 N (0-6)"
   exit 2
 fi
 
@@ -114,15 +114,7 @@ except: print(-1)
   ;;
 
 3)
-  # Phase 3: HA HomeKit Bridge advertising
-  check "HA homekit.yaml exists"     test -f /mnt/dietpi_userdata/homeassistant/homekit.yaml
-  check "port 21063 listening"       bash -c 'ss -tlnp 2>/dev/null | grep -q ":21063 "'
-  check "HA Bridge mDNS present"     bash -c 'avahi-browse -rt _hap._tcp 2>/dev/null | grep -qi "home assistant"'
-  check "old eSMART Bridge mDNS GONE" bash -c '! avahi-browse -rt _hap._tcp 2>/dev/null | grep -q "eSMART Bridge"'
-  ;;
-
-4)
-  # Phase 4: Google Home (optional)
+  # Phase 3: Google Home (optional)
   if [ ! -f /mnt/dietpi_userdata/homeassistant/google_assistant.yaml ]; then
     echo "  PASS: Google Home not configured (phase skipped cleanly)"
   else
@@ -130,8 +122,8 @@ except: print(-1)
   fi
   ;;
 
-5)
-  # Phase 5: systemd supervision + cold-boot survived
+4)
+  # Phase 4: systemd supervision + cold-boot survived
   check_eq "esmart-bridge active" "$(systemctl is-active esmart-bridge 2>/dev/null)" "active"
   check_eq "home-assistant active" "$(systemctl is-active home-assistant 2>/dev/null)" "active"
   check "esmart-bridge enabled"    bash -c 'systemctl is-enabled esmart-bridge 2>/dev/null | grep -q enabled'
@@ -142,18 +134,17 @@ except: print(-1)
   check "HA responds 8123"          bash -c 'curl -sfI http://127.0.0.1:8123 | head -1 | grep -q 200'
   ;;
 
-6)
-  # Phase 6: old Node.js HAP removed
+5)
+  # Phase 5: old Node.js HAP removed
   check "homebridge-esmart is gone" test ! -d /opt/esmart/homebridge-esmart
   check "archive exists"            bash -c 'ls /opt/esmart-archive/homebridge-esmart-* >/dev/null 2>&1'
-  check "no old mDNS"               bash -c '! avahi-browse -rt _hap._tcp 2>/dev/null | grep -q "eSMART Bridge"'
   NODES=$(curl -s http://127.0.0.1:8090/api/status 2>/dev/null | python3 -c "import json,sys; print(json.load(sys.stdin).get('known_nodes',-1))")
   check_eq "bridge still reports 11 nodes" "$NODES" "11"
   check "POST on 386/off succeeds"  bash -c 'curl -sf -X POST http://127.0.0.1:8090/api/node/386/off | grep -q "sent\\|status"'
   ;;
 
-7)
-  # Phase 7: run e2e
+6)
+  # Phase 6: run e2e
   bash scripts/e2e-test.sh
   exit $?
   ;;

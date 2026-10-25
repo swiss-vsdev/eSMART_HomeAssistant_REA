@@ -5,7 +5,7 @@
 set -u
 PHASE="${1:-}"
 if [ -z "$PHASE" ]; then
-  echo "usage: $0 N (0-7)"
+  echo "usage: $0 N (0-6)"
   exit 2
 fi
 
@@ -33,22 +33,6 @@ case "$PHASE" in
   ;;
 
 3)
-  echo "  Removing HA HomeKit Bridge config..."
-  sudo rm -f /mnt/dietpi_userdata/homeassistant/homekit.yaml
-  # Remove the `homekit:` block from configuration.yaml
-  sudo python3 - <<'PY'
-import re
-p = '/mnt/dietpi_userdata/homeassistant/configuration.yaml'
-txt = open(p).read()
-txt = re.sub(r'^homekit:\n(?:[ \t]+.*\n|\n)*', '', txt, flags=re.M)
-open(p, 'w').write(txt)
-PY
-  sudo systemctl restart home-assistant
-  sudo ufw delete allow 21063/tcp 2>/dev/null || true
-  echo "  HA HomeKit Bridge removed."
-  ;;
-
-4)
   echo "  Removing Google Assistant config (if present)..."
   sudo rm -f /mnt/dietpi_userdata/homeassistant/google_assistant.yaml
   sudo python3 - <<'PY'
@@ -64,7 +48,7 @@ PY
   sudo systemctl restart home-assistant 2>/dev/null || true
   ;;
 
-5)
+4)
   echo "  Restoring original systemd state..."
   BK=$(ls /home/dietpi/esmart-migration-backup/esmart-full-*.tgz 2>/dev/null | head -1)
   if [ -z "$BK" ]; then
@@ -80,7 +64,7 @@ PY
   echo "  Restored original esmart-bridge.service from $BK"
   ;;
 
-6)
+5)
   echo "  Restoring archived homebridge-esmart/..."
   if ls /opt/esmart-archive/homebridge-esmart-* >/dev/null 2>&1; then
     ARCHIVED=$(ls -d /opt/esmart-archive/homebridge-esmart-* | head -1)
@@ -91,8 +75,8 @@ PY
   fi
   ;;
 
-7)
-  echo "  No rollback for phase 7 (final verification)."
+6)
+  echo "  No rollback for phase 6 (final verification)."
   ;;
 
 *)

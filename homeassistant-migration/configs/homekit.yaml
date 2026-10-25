@@ -1,5 +1,9 @@
-# HomeKit Bridge filter — exposes only the eSMART entities
-# Referenced from configuration.yaml `homekit: - filter: !include homekit.yaml`
+# Reference HomeKit Bridge filter — exposes only the eSMART entities.
+# This file is NOT auto-installed. After migration, use the official HomeKit
+# Bridge integration in the Home Assistant UI (Settings → Devices & Services
+# → Add Integration → HomeKit Bridge). If you prefer YAML-based HomeKit, you
+# can copy this to /mnt/dietpi_userdata/homeassistant/homekit.yaml and add a
+# `homekit:` block to configuration.yaml yourself.
 
 include_entities:
   - switch.esmart_licht_1

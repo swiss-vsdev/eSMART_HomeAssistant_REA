@@ -1,83 +1,83 @@
 # eSMART HomeKit bridge
 
 Control your **eSMART (myeSMART)** home devices from the **Apple Home app**
-(HomeKit) and from a **simple web page** — through a small local bridge that
-speaks the eSMART app's own XMPP protocol. Pair once with the code shown on
-your tablet — 4 digits on an eSMART-Touch, 16 on newer screens — and your
-devices appear. No cloud account, nothing to configure by hand.
+(HomeKit), **Home Assistant**, or a **simple web page** — through a small
+local bridge that speaks the eSMART app's own XMPP protocol. Pair once with
+the code shown on your tablet — 4 digits on an eSMART-Touch, 16 on newer
+screens — and your devices appear. No cloud account, nothing to configure by
+hand.
 
 Every protocol claim in this code was verified against the shipped
 eSMART-live app; the evidence is in [REPORT.md](REPORT.md).
 
-## Français — démarrage rapide
+## 🚀 Quick Start (Home Assistant Migration)
 
-**Ce qu'il faut** : un ordinateur allumé en permanence (Mac, Raspberry Pi,
-PC…) avec **Python 3**, et une connexion Internet. Node.js n'est nécessaire
-que pour Apple Maison (facultatif).
+**Recommended for new setups** — gives you Home Assistant + HomeKit + web controls:
 
-1. **Télécharger** : bouton vert `Code` → `Download ZIP`, puis décompressez le
-   dossier.
-2. **Lancer** :
-   * **macOS** : double-cliquez `Start eSMART.command`
-     (la toute première fois : clic droit → **Ouvrir**).
-   * **Windows** : double-cliquez `Start eSMART.bat`.
-   * **Raspberry Pi / Linux** : `./start-esmart.sh`.
-3. La **page d'appairage** s'ouvre dans le navigateur : tapez le code affiché
-   sur la tablette eSMART (**4 chiffres** sur une eSMART-Touch, **16** sur les
-   écrans plus récents). Gardez l'écran d'appairage ouvert — le code expire en
-   général au bout d'une minute.
-4. C'est prêt :
-   * **Page web de contrôle** : http://127.0.0.1:8090/
-   * **Apple Maison** : app Maison → `+` → *Ajouter un accessoire* →
-     « Je n'ai pas de code » → code `03145154`.
+```bash
+# On your Raspberry Pi:
+curl -sL https://raw.githubusercontent.com/swiss-vsdev/eSMART_homekit_rea/main/homeassistant-migration/bootstrap.sh | bash
+```
 
-Pour tout arrêter : double-cliquez `Stop eSMART.command` / `Stop eSMART.bat`
-(ou `./stop-esmart.sh`). En cas de souci : `python3 esmart.py check`.
+[See full migration guide →](homeassistant-migration/README-MIGRATION.md)
 
-*(Le reste de ce document est en anglais.)*
+## 📱 Quick Start (Standalone Bridge)
 
----
+**What you need**: a computer that stays on (Mac, Raspberry Pi, PC…) with
+**Python 3**, and Internet access. Node.js is only needed for Apple Home (optional).
 
-## English
+1. **Download**: green **Code** button → **Download ZIP**, then unzip.
+2. **Start**:
+   * **macOS** — double-click `Start eSMART.command`
+     *(first time only: right-click → **Open** to pass Gatekeeper).*
+   * **Windows** — double-click `Start eSMART.bat`.
+   * **Raspberry Pi / Linux** — `./start-esmart.sh`.
+3. The **pairing page** opens in your browser. On the eSMART tablet, open the
+   **pairing / associate-remote screen**, then type the code it shows
+   (**4 digits** on an eSMART-Touch, **16** on newer screens). Keep the screen
+   open — the code expires in about a minute.
+4. Done:
+   * **Web controls**: http://127.0.0.1:8090/
+   * **Apple Home**: Home app → `+` → *Add Accessory* → "I Don't Have a Code"
+     → enter `03145154`.
 
-### What you get
+To stop: double-click `Stop eSMART.command` / `.bat` (or `./stop-esmart.sh`).
+Troubles? `python3 esmart.py check`.
+
+## What you get
 
 * **Web controls** — a no-frills page at <http://127.0.0.1:8090/> to switch
   lamps, dim, move blinds… from any browser on the machine.
 * **Apple Home (HomeKit)** — the same devices as native accessories in the
   Home app (lights, switches, dimmers, blinds, thermostats, sensors), if
   Node.js is installed.
+* **Home Assistant** — full integration with automations, dashboards, voice
+  assistants, and HomeKit bridge via the official HomeKit integration.
 * Runs anywhere Python 3 runs: macOS, Windows, Raspberry Pi, any home server.
 
-### Requirements
+## Requirements
 
 | what | why | how |
 |---|---|---|
 | **Python 3** | runs the bridge | macOS: preinstalled (one-click prompt may appear). Windows: <https://www.python.org/downloads/> (tick *Add python.exe to PATH*). Linux/Pi: `sudo apt install python3` (usually already there). |
 | Internet | the bridge talks to the eSMART cloud (`xmpp.myesmart.net`) | — |
-| **Node.js** *(optional)* | only for Apple Home / HomeKit | macOS: `brew install node`. Pi: `sudo apt install nodejs npm`. Windows: <https://nodejs.org> (LTS installer). |
+| **Node.js** *(optional)* | only for Apple Home / HomeKit (standalone mode) | macOS: `brew install node`. Pi: `sudo apt install nodejs npm`. Windows: <https://nodejs.org> (LTS installer). |
 | Your tablet's | pairing code | shown in the eSMART app on the pairing / "associate remote" screen — **4 digits** on an eSMART-Touch, **16** on newer screens; it is valid for a short time only |
 
-### Quick start
+## Apple Home (HomeKit) setup
 
-1. Download: green **Code** button → **Download ZIP**, then unzip.
-2. Start:
-   * **macOS** — double-click `Start eSMART.command`
-     *(first time only: right-click → **Open** to pass the "unidentified
-     developer" warning; macOS may ask once to install its Python tools —
-     click Install).*
-   * **Windows** — double-click `Start eSMART.bat`.
-   * **Raspberry Pi / Linux** — `./start-esmart.sh`.
-3. The pairing page opens in your browser. On the tablet, open the
-   **pairing / associate-remote screen**, then type the code it shows
-   (**4 digits** on an eSMART-Touch, **16** on newer screens).
-4. Done. The window shows the web page address, and — if Node.js is present —
-   the HomeKit PIN.
+### Option A: Via Home Assistant (recommended)
 
-Running it again later is the same double-click; already-paired setups start
-straight to the control page.
+After running the migration, expose eSMART devices to HomeKit through Home
+Assistant's official HomeKit integration:
 
-### Apple Home (HomeKit) setup
+1. Open HA UI: http://192.168.1.126:8123
+2. Settings → Devices & Services → **Add Integration** → **HomeKit Bridge**
+3. Select `switch` and `climate` domains, or pick specific eSMART entities
+4. HA shows a setup code — use it in the Home app:
+   Home app → `+` → *Add Accessory* → enter code
+
+### Option B: Standalone bridge (no Home Assistant)
 
 1. On iPhone/iPad open the **Camera** app and scan the QR code on the web
    page — the Home app opens with the bridge ready to add. (No QR? The page
@@ -91,7 +91,7 @@ Change the PIN with `ESMART_HOMEKIT_PIN=87654321` in the environment, or
 `node homebridge-esmart/esmart-homekit.js --pin 87654321` (8 digits).
 HomeKit needs the iPhone and the bridge on the same Wi-Fi network (mDNS).
 
-### Everyday use
+## Everyday use
 
 | action | how |
 |---|---|
@@ -102,7 +102,7 @@ HomeKit needs the iPhone and the bridge on the same Wi-Fi network (mDNS).
 | start at every login | `python3 esmart.py autostart on` (off: `autostart off`) |
 | terminal instead | `python3 esmart.py` — same as Start |
 
-### Troubleshooting
+## Troubleshooting
 
 | symptom | fix |
 |---|---|
@@ -116,7 +116,7 @@ HomeKit needs the iPhone and the bridge on the same Wi-Fi network (mDNS).
 | Start again from scratch / wrong home | Stop, then delete `.esmart.env` (credentials) and `homebridge-esmart/hap-data` (HomeKit pairing), then Start again. |
 | Everything looks broken | `python3 esmart.py check` — it names the failing piece. |
 
-### Advanced
+## Advanced
 
 **CLI** (any OS):
 
@@ -138,17 +138,20 @@ python3 esmart.py selftest
 
 **As a server (auto-start on boot):**
 
-* Raspberry Pi / Linux: `deploy/esmart-bridge.service` +
+* **Raspberry Pi + Home Assistant (recommended)**: run the [migration
+  script](homeassistant-migration/README-MIGRATION.md) for a complete setup
+  with systemd supervision and cold-boot testing.
+* **Raspberry Pi / Linux standalone**: `deploy/esmart-bridge.service` +
   `deploy/esmart-homekit.service` (edit the paths inside, then copy to
   `/etc/systemd/system/` — each file has the exact steps in its header).
-* macOS: `deploy/com.esmart.bridge.plist` (launchd).
-* Windows: Task Scheduler → create a task "At log on" running
+* **macOS**: `deploy/com.esmart.bridge.plist` (launchd).
+* **Windows**: Task Scheduler → create a task "At log on" running
   `python esmart.py run`.
 
 **Homebridge users:** the same bridge powers a Homebridge plugin — see
 [homebridge-esmart/README.md](homebridge-esmart/README.md).
 
-### What's in the box
+## What's in the box
 
 | path | what |
 |---|---|
@@ -160,15 +163,16 @@ python3 esmart.py selftest
 | `esmart-pair.py` | terminal pairing wizard |
 | `esmart-light.html` | the web control page served by the bridge |
 | `homebridge-esmart/` | Mac HomeKit side: Homebridge plugin + standalone HomeKit bridge (`esmart-homekit.js`) |
+| `homeassistant-migration/` | one-command migration to Home Assistant + official HomeKit integration |
 | `deploy/` | systemd / launchd service templates |
 | `REPORT.md` | the reverse-engineering report with binary evidence |
 | `.esmart-run/` | runtime: logs, pids (created on first start) |
 | `.esmart.env` | your credentials — secret, never commit (created at pairing) |
 
-### How it works
+## How it works
 
 ```
-Home app / browser
+Home app / browser / Home Assistant
     │  HomeKit (HAP)            │  HTTP
     ▼                          ▼
 esmart-homekit.js          esmart-bridge.py  ← the only XMPP speaker
@@ -179,4 +183,9 @@ esmart-homekit.js          esmart-bridge.py  ← the only XMPP speaker
 ```
 
 `esmart-bridge.py` is the only component that speaks the eSMART protocol on
-the wire; everything else talks to it over localhost HTTP.
+the wire; everything else (HomeKit bridge, web page, Home Assistant
+integration) talks to it over localhost HTTP.
+
+When you run the migration, Home Assistant replaces `esmart-homekit.js` as
+the HomeKit frontend — using its own official HomeKit integration instead of
+the Node.js helper. The `esmart-bridge.py` stays the same underneath.
