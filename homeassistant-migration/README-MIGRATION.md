@@ -2,11 +2,30 @@
 
 This migration moves your eSMART devices from the custom Node.js HomeKit bridge to Home Assistant with native HomeKit support.
 
-## Quick Start
+## 🚀 Quick Start (One-liner)
 
-### On your Raspberry Pi
+**Recommended**: Run this on your Raspberry Pi to update and start the migration automatically:
 
-**Method 1: If eSMART is already installed on your Pi (recommended)**
+```bash
+ssh dietpi@192.168.1.126
+curl -sL https://raw.githubusercontent.com/swiss-vsdev/eSMART_homekit_rea/main/homeassistant-migration/bootstrap.sh | bash
+```
+
+Or manually:
+```bash
+ssh dietpi@192.168.1.126
+wget -O /tmp/bootstrap.sh https://raw.githubusercontent.com/swiss-vsdev/eSMART_homekit_rea/main/homeassistant-migration/bootstrap.sh
+bash /tmp/bootstrap.sh
+```
+
+The bootstrap script will:
+1. Update your eSMART repository to the latest version
+2. Verify eSMART is working
+3. Run the full migration automatically
+
+## 📋 Alternative Methods
+
+### Method 1: If eSMART is already installed on your Pi
 
 ```bash
 # SSH to your Pi
@@ -23,18 +42,7 @@ cd homeassistant-migration
 ./run-migration.sh
 ```
 
-**Method 2: One-liner bootstrap**
-
-```bash
-# SSH to your Pi
-ssh dietpi@192.168.1.126
-
-# Download and run bootstrap (will update repo and start migration)
-wget -O /tmp/bootstrap.sh https://raw.githubusercontent.com/swiss-vsdev/eSMART_homekit_rea/main/homeassistant-migration/bootstrap.sh
-bash /tmp/bootstrap.sh
-```
-
-**Method 3: Clone fresh**
+### Method 2: Clone fresh
 
 ```bash
 # SSH to your Pi
