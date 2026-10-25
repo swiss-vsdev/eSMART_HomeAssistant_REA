@@ -61,8 +61,8 @@ case "$PHASE" in
   else
     echo "  FAIL: no backup tarball at /home/dietpi/esmart-migration-backup/"; FAIL=1
   fi
-  check "no esmart-homekit.js running"    bash -c '! pgrep -f esmart-homekit.js >/dev/null'
-  check "no esmart-bridge.py running"     bash -c '! pgrep -f "esmart-bridge.py" >/dev/null'
+  check "no esmart-homekit.js running"    bash -c '! pgrep -f "[e]smart-homekit.js" >/dev/null'
+  check "no esmart-bridge.py running"     bash -c '! pgrep -f "[e]smart-bridge.py" >/dev/null'
   check_eq "LAN IP" "$(ip -4 -o addr show eth0 | awk '{print $4}' | cut -d/ -f1)" "192.168.1.126"
   ;;
 
