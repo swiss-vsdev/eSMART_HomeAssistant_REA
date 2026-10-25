@@ -4,20 +4,48 @@ This migration moves your eSMART devices from the custom Node.js HomeKit bridge 
 
 ## Quick Start
 
-### On your MacBook (local machine)
-```bash
-# Install the migration kit on your Pi
-cd /Users/gabrielzeizer/Documents/GitHub/eSMART_homekit_rea/homeassistant-migration
-./install-on-pi.sh
-```
-
 ### On your Raspberry Pi
+
+**Method 1: If eSMART is already installed on your Pi (recommended)**
+
 ```bash
 # SSH to your Pi
 ssh dietpi@192.168.1.126
 
+# Navigate to your eSMART installation
+cd /opt/esmart
+
+# Update to latest version with migration scripts
+git pull origin main
+
 # Run the migration
-cd /opt/esmart-migration
+cd homeassistant-migration
+./run-migration.sh
+```
+
+**Method 2: One-liner bootstrap**
+
+```bash
+# SSH to your Pi
+ssh dietpi@192.168.1.126
+
+# Download and run bootstrap (will update repo and start migration)
+wget -O /tmp/bootstrap.sh https://raw.githubusercontent.com/swiss-vsdev/eSMART_homekit_rea/main/homeassistant-migration/bootstrap.sh
+bash /tmp/bootstrap.sh
+```
+
+**Method 3: Clone fresh**
+
+```bash
+# SSH to your Pi
+ssh dietpi@192.168.1.126
+
+# Clone the repository
+cd /opt
+git clone https://github.com/swiss-vsdev/eSMART_homekit_rea.git esmart
+cd esmart/homeassistant-migration
+
+# Run the migration
 ./run-migration.sh
 ```
 
@@ -53,7 +81,7 @@ cd /opt/esmart-migration
 
 ## Files created
 
-- `/opt/esmart-migration/` - Migration scripts and configs
+- `/opt/esmart/homeassistant-migration/` - Migration scripts and configs
 - `/mnt/dietpi_userdata/homeassistant/packages/esmart_bridge.yaml` - eSMART device definitions
 - `/mnt/dietpi_userdata/homeassistant/homekit.yaml` - HomeKit bridge config
 - `/etc/systemd/system/esmart-bridge.service` - Improved systemd service
