@@ -2,7 +2,7 @@
 # eSMART Hardened Bridge — one-command fresh install
 #
 # Run on DietPi / Raspberry Pi (brand new install, never had eSMART before):
-#   curl -sL https://raw.githubusercontent.com/swiss-vsdev/esmart-hardened/main/bootstrap.sh | sudo bash
+#   curl -sL https://raw.githubusercontent.com/swiss-vsdev/eSMART_HomeAssistant_REA/main/bootstrap.sh | sudo bash
 #
 # What it does:
 # 1. Installs the bridge in /opt/esmart with TCP keepalive (no upstream Python patches)
@@ -23,7 +23,7 @@
 set -euo pipefail
 
 INSTALL_DIR="${INSTALL_DIR:-/opt/esmart}"
-REPO_URL="${REPO_URL:-https://github.com/swiss-vsdev/esmart-hardened.git}"
+REPO_URL="${REPO_URL:-https://github.com/swiss-vsdev/eSMART_HomeAssistant_REA.git}"
 PORT=8090
 PIN="${ESMART_HOMEKIT_PIN:-03145154}"
 WITH_HOMEKIT=0
@@ -48,7 +48,7 @@ log "HomeKit: $([ "$WITH_HOMEKIT" -eq 1 ] && echo "ENABLED" or echo "SKIPPED (ad
 
 # 1. Clone repo
 if [ ! -d "$INSTALL_DIR/.git" ]; then
-    log "Cloning esmart-hardened..."
+    log "Cloning eSMART_HomeAssistant_REA..."
     git clone --depth 1 "$REPO_URL" "$INSTALL_DIR"
 else
     log "Repository present; updating..."
@@ -115,6 +115,6 @@ log "Without HomeKit: just use the web UI at http://127.0.0.1:$PORT/"
 log "Or control via Home Assistant automations."
 log ""
 log "To add standalone HomeKit later (optional):"
-log "curl -sL https://raw.githubusercontent.com/swiss-vsdev/esmart-hardened/main/bootstrap.sh | sudo bash -s -- --with-homekit --pin $PIN"
+log "curl -sL https://raw.githubusercontent.com/swiss-vsdev/eSMART_HomeAssistant_REA/main/bootstrap.sh | sudo bash -s -- --with-homekit --pin $PIN"
 
 exit 0
