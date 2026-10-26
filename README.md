@@ -1,41 +1,60 @@
-# eSMART HomeKit/HomeAssistant bridge
+# eSMART Home Assistant Bridge
 
-Control your **eSMART (myeSMART)** home devices from the **Apple Home app**
-(HomeKit), **Home Assistant**, or a **simple web page** — through a small
-local bridge that speaks the eSMART app's own XMPP protocol.
+A local bridge for eSMART home devices that speaks the eSMART app's own XMPP protocol.
 
-## 🚀 Install — one command
+Control your devices from Home Assistant, the Home app, or a simple web page.
 
-**With HomeKit (standalone, no Home Assistant needed):**
+## 🚀 One-Command Install (fresh Pi, never had eSMART before)
+
+```bash
+curl -sL https://raw.githubusercontent.com/swiss-vsdev/esmart-hardened/main/bootstrap.sh | sudo bash
+```
+
+This installs:
+
+- Bridge in `/opt/esmart` with TCP keepalive
+- systemd service with `Restart=always`
+- Bridge watchdog (restarts after 3 failed `/api/status` checks)
+- HA package config with `scan_interval: 3`
+- Service enabled and started
+
+## 🛠️ After Install — Add HomeKit
+
+1. Ensure Home Assistant is running and you can see the eSMART entities
+2. HA UI: **Settings → Devices & Services → Add Integration → HomeKit Bridge**
+3. Select eSMART entities to expose
+4. **Home app → + → Add Accessory → enter HA setup code**
+
+**Result:** Control eSMART through Home Assistant automations AND have HomeKit access through HA's HomeKit bridge.
+
+## 🛠️ Optional — Standalone HomeKit (requires Node.js)
 
 ```bash
 curl -sL https://raw.githubusercontent.com/swiss-vsdev/esmart-hardened/main/bootstrap.sh | sudo bash -s -- --with-homekit --pin 03145154
 ```
 
-**Home Assistant migration only:**
+This also installs the Node.js Homebridge plugin alongside the systemd bridge.
 
-```bash
-curl -sL https://raw.githubusercontent.com/swiss-vsdev/esmart-hardened/main/bootstrap.sh | sudo bash -s -- --skip-ha
-```
+## 🚩 bootstrap.sh Flags
 
-> Run again anytime to update hardened pieces (idempotent). No Python files
-> are ever touched, so `git pull upstream main` stays conflict-free.
+- `--with-homekit` — Install Node.js Homebridge plugin + standalone HomeKit bridge
+- `--port 8090` — HTTP bridge port (default `8090`)
+- `--pin 03145154` — HomeKit PIN (8 digits, default `03145154`)
+- `--skip-ha` — Skip the HA `scan_interval: 3` patch
 
-## 📁 Repository structure (what you're getting)
+**Default (no flags):** Full install — bridge + systemd + keepalive + watchdog + HA `scan_interval: 3`.
 
-```
-lib/              keepalive-wrapper.py, watchdog.sh       ← core fixes
-deploy/           systemd service files                      ← supervision
-homeassistant-migration/ ← HA integration with scan_interval: 3
-docs/             HARDENING.md, TROUBLESHOOTING.md       ← documentation
-bootstrap.sh      one-command installer              ← run this
-```
+## 📦 What You Get
 
-## 🔍 Verify the hardening is active
+- Bridge running at `http://127.0.0.1:8090/`
+- Web controls at `http://127.0.0.1:8090/`
+- TCP keepalive prevents "switch frozen" after a few days
+- Bridge watchdog restarts the link if it goes dead
+- HA poll interval of 3 seconds (fast response to toggles)
+- HomeKit via Home Assistant UI or standalone with Node.js
 
-```bash
-systemctl is-active esmart-bridge                      # must be "active"
-systemctl is-active esmart-bridge-watchdog.timer     # must be "active"
-ss -tnoe state established '( dport = :5222 )'      # shows TCP keepalive timer
-grep scan_interval /path/to/esmart_bridge.yaml        # should show 3
-```
+## 🔧 Without Home Assistant
+
+Run the bridge standalone and control from the web page at `http://127.0.0.1:8090/`.
+
+Or add `--with-homekit --pin 03145154` during install for standalone HomeKit (needs Node.js).
