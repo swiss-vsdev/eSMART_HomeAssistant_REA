@@ -1,0 +1,30 @@
+# eSMART bridge health watchdog.
+#
+# Checks /api/status every 30 s.  After 3 consecutive failures (90 s) the
+# bridge is restarted.  This catches the two failure modes systemd's own
+# Restart=always cannot:
+#   1. the bridge process is alive but its XMPP socket is half-open
+#      ("online": false) -- systemd sees exit 0 and does nothing;
+#   2. the bridge exited 0 on a clean disconnect -- systemd reports
+#      "active (exited)" and never restarts.
+#
+# Install:
+#   sudo cp deploy/esmart-bridge-watchdog.service /etc/systemd/system/
+#   sudo cp deploy/esmart-bridge-watchdog.timer   /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now esmart-bridge-watchdog.timer
+
+[Unit]
+Description=eSMART bridge health watchdog
+After=network-online.target esmart-bridge.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bash /opt/esmart/lib/watchdog.sh
+# systemd creates /var/lib/esmart-bridge-watchdog; the consecutive-failure
+# counter lives there so it survives each oneshot run (/run would be wiped).
+StateDirectory=esmart-bridge-watchdog
+
+[Install]
+WantedBy=multi-user.target

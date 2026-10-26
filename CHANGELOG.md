@@ -15,9 +15,10 @@ Hardened fork of `swiss-vsdev/eSMART_homekit_rea` @ 2026-10-17.
 - `docs/HARDENING.md`, `docs/TROUBLESHOOTING.md`.
 
 ### Changed
-- `deploy/esmart-bridge.service`: `Type=oneshot` → `Type=simple` with
-  `Restart=always`, `RestartSec=10`. Fixes a bug where a crashed bridge
-  was never restarted because systemd reported `active (exited)` forever.
+- `deploy/esmart-bridge.service`: `ExecStart` now runs the bridge through
+  `lib/keepalive-wrapper.py`, and `Restart=on-failure` → `Restart=always`
+  with `RestartSec=10`. Fixes a bug where a bridge that exited `0` on a
+  clean XMPP disconnect was never restarted.
 - `homeassistant-migration/bootstrap.sh`: applies
   `scan_interval: 5` → `3` patch and restarts the HA container.
 

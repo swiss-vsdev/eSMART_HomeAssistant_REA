@@ -18,7 +18,9 @@ Wants=network-online.target
 [Service]
 Type=simple
 WorkingDirectory=/opt/esmart
-ExecStart=/usr/bin/python3 /opt/esmart/esmart.py run
+# keepalive-wrapper.py monkey-patches socket.socket before running the bridge,
+# so the XMPP socket gets TCP keepalive without touching upstream Python.
+ExecStart=/usr/bin/python3 /opt/esmart/lib/keepalive-wrapper.py /opt/esmart/esmart-bridge.py --port 8090 --host 127.0.0.1
 Restart=always
 RestartSec=10
 
