@@ -1,0 +1,21 @@
+# Periodic health check for the eSMART bridge.
+#
+# Install:
+#   sudo cp deploy/esmart-bridge-watchdog.{service,timer} /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now esmart-bridge-watchdog.timer
+#
+# See:  systemctl list-timers esmart-bridge-watchdog.timer
+#       journalctl -u esmart-bridge-watchdog -f
+
+[Unit]
+Description=eSMART bridge health watchdog (every 30s)
+
+[Timer]
+OnBootSec=30
+OnUnitActiveSec=30
+AccuracySec=1s
+Unit=esmart-bridge-watchdog.service
+
+[Install]
+WantedBy=timers.target
