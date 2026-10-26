@@ -1,10 +1,12 @@
-# eSMART HomeKit bridge
+# eSMART HomeKit bridge — hardened fork
 
-> **This is a hardened fork.** It adds TCP keepalive, a health watchdog,
-> and `Restart=always` systemd units on top of
-> [swiss-vsdev/eSMART_homekit_rea](https://github.com/swiss-vsdev/eSMART_homekit_rea).
-> See [`docs/HARDENING.md`](docs/HARDENING.md) for what changed and why.
-> For a vanilla setup, use the upstream repo instead.
+> **Hardened fork** of `swiss-vsdev/eSMART_homekit_rea`. Adds TCP keepalive,
+> a bridge health watchdog, and robust systemd supervision. If you had
+> "the switch in Home Assistant freeze after a week", this fork fixes it.
+> For a vanilla setup, use upstream instead.
+
+[![Hardened Fork](https://img.shields.io/badge/fork-hardened-blue.svg)](docs/HARDENING.md)
+[![Upstream](https://img.shields.io/badge/upstream-swiss--vsdev%2FeSMART__homekit__rea-lightgrey.svg)](https://github.com/swiss-vsdev/eSMART_homekit_rea)
 
 Control your **eSMART (myeSMART)** home devices from the **Apple Home app**
 (HomeKit), **Home Assistant**, or a **simple web page** — through a small
@@ -16,14 +18,24 @@ hand.
 Every protocol claim in this code was verified against the shipped
 eSMART-live app; the evidence is in [REPORT.md](REPORT.md).
 
-## 🚀 Quick Start (Home Assistant Migration)
+## Install (fresh DietPi / Raspberry Pi)
 
-**Recommended for new setups** — gives you Home Assistant + HomeKit + web controls:
+> **Hardened fork installer** (recommended) — runs `bootstrap.sh` which sets up
+> all hardening fixes, systemd units, keepalive wrapper, watchdog, and the
+> `scan_interval: 3` HA patch automatically.
 
 ```bash
-# On your Raspberry Pi:
-curl -sL https://raw.githubusercontent.com/swiss-vsdev/eSMART_homekit_rea/main/homeassistant-migration/bootstrap.sh | bash
+curl -sL https://raw.githubusercontent.com/swiss-vsdev/esmart-hardened/main/bootstrap.sh \
+  | sudo bash -s -- --with-homekit --pin 03145154
 ```
+
+## Already installed?
+
+```bash
+cd /opt/esmart && git pull && sudo bash bootstrap.sh
+```
+
+Idempotent — patches `scan_interval`, rewrites systemd units, restarts services.
 
 [See full migration guide →](homeassistant-migration/README-MIGRATION.md)
 
