@@ -5,6 +5,10 @@
 # 3. sudo systemctl daemon-reload
 # 4. sudo systemctl enable --now esmart-bridge
 # 5. Live logs:  journalctl -u esmart-bridge -f
+#
+# Restart=always (not on-failure): the bridge can exit 0 after a clean
+# XMPP disconnect and systemd would otherwise report "active (exited)"
+# forever, leaving the socket dead. always restarts regardless of code.
 
 [Unit]
 Description=eSMART local bridge (HTTP + XMPP)
@@ -15,8 +19,8 @@ Wants=network-online.target
 Type=simple
 WorkingDirectory=/opt/esmart
 ExecStart=/usr/bin/python3 /opt/esmart/esmart.py run
-Restart=on-failure
-RestartSec=5
+Restart=always
+RestartSec=10
 
 [Install]
 WantedBy=multi-user.target
