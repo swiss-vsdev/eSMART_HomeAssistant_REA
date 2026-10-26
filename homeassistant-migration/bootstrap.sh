@@ -97,6 +97,49 @@ log "Setting up migration scripts..."
 chmod +x homeassistant-migration/run-migration.sh
 chmod +x homeassistant-migration/scripts/*.sh
 
+# Apply the scan_interval patch to an already-deployed HA package (fix #6).
+# Fresh installs get scan_interval: 3 straight from configs/packages-esmart.yaml,
+# so this only matters for installs that predate the change.
+apply_scan_interval_patch() {
+    local patch="homeassistant-migration/patches/esmart_bridge.scan_interval.patch"
+    local ha_config
+    ha_config="${HA_CONFIG:-$(ls -d /opt/homeassistant /mnt/dietpi_userdata/homeassistant 2>/dev/null | head -1)}"
+    local pkg="$ha_config/packages/esmart_bridge.yaml"
+
+    [ -n "$ha_config" ] && [ -f "$pkg" ] || return 0
+    if grep -q "scan_interval: 3" "$pkg"; then
+        log "scan_interval already 3, patch not needed"
+        return 0
+    fi
+    # patch --dry-run fails cleanly if upstream changed the context around
+    # scan_interval -- unlike a blind sed, it never rewrites a line it did not
+    # see. If it fails, tell the user instead of guessing.
+    # -N/--forward: never reverse-apply, never prompt (an already-applied patch
+# must fail the dry-run silently, not hang the installer on aTTY question).
+if patch -N --dry-run -p1 -d "$ha_config" < "$patch" 2>/dev/null; then
+        log "Patching scan_interval 5 -> 3 in $pkg"
+        patch -N -p1 -d "$ha_config" < "$patch" || error_exit "Failed to apply scan_interval patch"
+        restart_ha
+    else
+        log "WARNING: $pkg does not match the scan_interval patch (value already changed upstream?)."
+        log "Fix manually: set scan_interval: 3 under 'rest:' -> 'resource: .../api/nodes'."
+    fi
+}
+
+restart_ha() {
+    if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx homeassistant; then
+        log "Restarting Docker container homeassistant..."
+        docker restart homeassistant
+    elif systemctl list-unit-files 2>/dev/null | grep -q '^home-assistant\.service'; then
+        log "Restarting home-assistant.service..."
+        sudo systemctl restart home-assistant
+    else
+        log "Home Assistant not found as container or service; restart it manually to pick up scan_interval."
+    fi
+}
+
+apply_scan_interval_patch
+
 log_step "Bootstrap complete"
 
 log "Next steps:"

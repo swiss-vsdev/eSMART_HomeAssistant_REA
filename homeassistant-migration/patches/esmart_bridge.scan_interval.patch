@@ -1,0 +1,11 @@
+--- a/packages/esmart_bridge.yaml
++++ b/packages/esmart_bridge.yaml
+@@ -12,7 +12,7 @@
+
+ rest:
+   - resource: http://127.0.0.1:8090/api/nodes
+-    scan_interval: 5
++    scan_interval: 3
+     method: GET
+     sensor:
+       - name: "eSMART nodes raw"
