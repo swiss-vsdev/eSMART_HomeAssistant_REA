@@ -7,7 +7,7 @@ Control your devices from Home Assistant, the Home app, or a simple web page.
 ## 🚀 One-Command Install (fresh Pi, never had eSMART before)
 
 ```bash
-curl -sL https://raw.githubusercontent.com/swiss-vsdev/esmart-hardened/main/bootstrap.sh | sudo bash
+curl -sL https://raw.githubusercontent.com/swiss-vsdev/eSMART_HomeAssistant_REA/main/bootstrap.sh | sudo bash
 ```
 
 This installs:
@@ -30,7 +30,7 @@ This installs:
 ## 🛠️ Optional — Standalone HomeKit (requires Node.js)
 
 ```bash
-curl -sL https://raw.githubusercontent.com/swiss-vsdev/esmart-hardened/main/bootstrap.sh | sudo bash -s -- --with-homekit --pin 03145154
+curl -sL https://raw.githubusercontent.com/swiss-vsdev/eSMART_HomeAssistant_REA/main/bootstrap.sh | sudo bash -s -- --with-homekit --pin 03145154
 ```
 
 This also installs the Node.js Homebridge plugin alongside the systemd bridge.
