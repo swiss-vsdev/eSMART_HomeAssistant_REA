@@ -49,7 +49,6 @@ template:
       - name: "eSMART setpoint 1"
         unique_id: esmart_setpoint_1
         state: "{{ (state_attr('sensor.esmart_nodes_raw','esmart_nodes_raw') or []) | selectattr('id','eq',1) | map(attribute='state.setpoint') | first | default(20) }}"
-
       - name: "eSMART state 13"     # Licht 1 (OnOff)
         unique_id: esmart_state_13
         state: "{{ (state_attr('sensor.esmart_nodes_raw','esmart_nodes_raw') or []) | selectattr('id','eq',13) | map(attribute='state.onoff') | first | default('off') }}"

@@ -94,11 +94,11 @@ if [ "$SKIP_HA" -eq 0 ]; then
     HA_CONFIG="${HA_CONFIG:-$(ls -d /opt/homeassistant /mnt/dietpi_userdata/homeassistant 2>/dev/null | head -1)}"
     if [ -n "$HA_CONFIG" ] && [ -f "$HA_CONFIG/packages/esmart_bridge.yaml" ]; then
         patch -N --dry-run -p1 -d "$HA_CONFIG" < homeassistant-migration/patches/esmart_bridge.scan_interval.patch 2>/dev/null && {
-            log "Patching scan_interval 5 -> 3..."
+            log "Patching scan_interval 5 -> 3 in $HA_CONFIG"
             patch -N -p1 -d "$HA_CONFIG" < homeassistant-migration/patches/esmart_bridge.scan_interval.patch
             if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx homeassistant; then
                 docker restart homeassistant
-            elif systemctl list-unit-files 2>/dev/null | grep -q '^home-assistant\.service'; then
+            elif systemctl list-unit-files 2>/dev/null | grep -q '^home-assistant.service'; then
                 sudo systemctl restart home-assistant
             else
                 log "Home Assistant not found; restart it manually."

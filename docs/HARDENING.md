@@ -70,7 +70,7 @@ anything. `socket.create_connection()` builds its socket through
 `socket.socket`, so replacing the class in the `socket` module covers the XMPP
 socket without importing or modifying `esmart_core`.
 
-One platform trap, encoded in the wrapper: Linux names the idle knob
+One platform trap, encoded in the wrapper: Linux names the first probe threshold
 `TCP_KEEPIDLE`, macOS names it `TCP_KEEPALIVE`, and macOS **silently ignores it
 when set before `connect()`** — the kernel keeps reporting the compiled default
 of 7200 s. So `SO_KEEPALIVE` is set in `__init__` and the three TCP options are
@@ -100,10 +100,7 @@ grep scan_interval /mnt/dietpi_userdata/homeassistant/packages/esmart_bridge.yam
 
 ```bash
 sudo systemctl disable --now esmart-bridge esmart-homekit esmart-bridge-watchdog.timer
-sudo rm -f /etc/systemd/system/esmart-bridge.service \
-          /etc/systemd/system/esmart-homekit.service \
-          /etc/systemd/system/esmart-bridge-watchdog.service \
-          /etc/systemd/system/esmart-bridge-watchdog.timer
+sudo rm -f /etc/systemd/system/esmart-*.service /etc/systemd/system/esmart-bridge-watchdog.timer
 sudo rm -rf /var/lib/esmart-bridge-watchdog
 sudo systemctl daemon-reload
 # optional, removes the whole install:

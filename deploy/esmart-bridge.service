@@ -7,8 +7,8 @@
 # 5. Live logs:  journalctl -u esmart-bridge -f
 #
 # Restart=always (not on-failure): the bridge can exit 0 after a clean
-# XMPP disconnect and systemd would otherwise report "active (exited)"
-# forever, leaving the socket dead. always restarts regardless of code.
+# XMPP disconnect and systemd would otherwise report `active (exited)` forever,
+# leaving the socket dead. always restarts regardless of code.
 
 [Unit]
 Description=eSMART local bridge (HTTP + XMPP)
@@ -18,9 +18,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 WorkingDirectory=/opt/esmart
-# keepalive-wrapper.py monkey-patches socket.socket before running the bridge,
-# so the XMPP socket gets TCP keepalive without touching upstream Python.
-ExecStart=/usr/bin/python3 /opt/esmart/lib/keepalive-wrapper.py /opt/esmart/esmart-bridge.py --port 8090 --host 127.0.0.1
+ExecStart=/usr/bin/python3 /opt/esmart/esmart.py run
 Restart=always
 RestartSec=10
 

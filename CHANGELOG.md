@@ -15,20 +15,11 @@ Hardened fork of `swiss-vsdev/eSMART_homekit_rea` @ 2026-10-17.
 - `docs/HARDENING.md`, `docs/TROUBLESHOOTING.md`.
 
 ### Changed
-- `deploy/esmart-bridge.service`: `ExecStart` now runs the bridge through
-  `lib/keepalive-wrapper.py`, and `Restart=on-failure` → `Restart=always`
-  with `RestartSec=10`. Fixes a bug where a bridge that exited `0` on a
-  clean XMPP disconnect was never restarted.
-- `homeassistant-migration/bootstrap.sh`: applies
-  `scan_interval: 5` → `3` patch and restarts the HA container.
+- `deploy/esmart-bridge.service`: `Type=simple` with `Restart=always`, `RestartSec=10`. Fixes a bug where a crashed bridge was never restarted because systemd reported `active (exited)` forever.
+- `homeassistant-migration/bootstrap.sh`: applies `scan_interval: 5` → `3` patch and restarts the HA container.
 
 ### Fixed
-- **Zombie XMPP socket**: bridge wrote commands to a half-open TCP
-  connection, never received state updates. Fixes: TCP keepalive (§1) +
-  watchdog (§2). Symptom: switch in HA stays frozen while physical light
-  changes.
+- **Zombie XMPP socket**: bridge wrote commands to a half-open TCP connection, never received state updates. Fixes: TCP keepalive (§1) + watchdog (§2). Symptom: switch in HA stays frozen while physical light changes.
 
 ### Not changed
-- All upstream Python sources (`esmart.py`, `esmart-bridge.py`,
-  `esmart_core.py`, `esmart-pair.py`) are **untouched** so `git pull
-  upstream main` stays conflict-free.
+- All upstream Python sources (`esmart.py`, `esmart-bridge.py`, `esmart_core.py`, `esmart-pair.py`) are **untouched** so `git pull upstream main` stays conflict-free.
