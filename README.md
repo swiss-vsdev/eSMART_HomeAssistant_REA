@@ -1,5 +1,11 @@
 # eSMART HomeKit bridge
 
+> **This is a hardened fork.** It adds TCP keepalive, a health watchdog,
+> and `Restart=always` systemd units on top of
+> [swiss-vsdev/eSMART_homekit_rea](https://github.com/swiss-vsdev/eSMART_homekit_rea).
+> See [`docs/HARDENING.md`](docs/HARDENING.md) for what changed and why.
+> For a vanilla setup, use the upstream repo instead.
+
 Control your **eSMART (myeSMART)** home devices from the **Apple Home app**
 (HomeKit), **Home Assistant**, or a **simple web page** — through a small
 local bridge that speaks the eSMART app's own XMPP protocol. Pair once with
