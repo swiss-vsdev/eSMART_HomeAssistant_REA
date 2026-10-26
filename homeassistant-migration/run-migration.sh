@@ -71,8 +71,18 @@ for PHASE in {0..6}; do
         ;;
     1)
         # Phase 1: Install Home Assistant Core
-        log "Installing Home Assistant Core (DietPi software ID 157)..."
-        sudo dietpi-software install 157
+        # Check if HA is already installed (user may have installed manually)
+        if curl -sI http://[IP_ADDRESS]:8123 2>/dev/null | head -1 | grep -q 200; then
+            log "Home Assistant already installed and running"
+        else
+            log "Installing Home Assistant Core (DietPi software ID 157)..."
+            if ! sudo dietpi-software install 157 2>/dev/null; then
+                log "dietpi-software install failed. Please install HA manually:"
+                log "  sudo dietpi-software"
+                log "  Then select Home Assistant (157) and Install"
+                read -p "Press Enter after installing HA manually..."
+            fi
+        fi
         
         # Wait for HA to be responsive
         log "Waiting for Home Assistant to be ready..."
