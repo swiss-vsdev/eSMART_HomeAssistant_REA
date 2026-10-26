@@ -30,7 +30,8 @@ check_eq() {
 }
 
 HA_TOKEN="${HA_TOKEN:-}"
-HA_URL="http://127.0.0.1:8123"
+HA_CONFIG="${HA_CONFIG:-$(ls -d /opt/homeassistant /mnt/dietpi_userdata/homeassistant 2>/dev/null | head -1)}"
+HA_URL="http://[IP_ADDRESS]:8123"
 AUTH_HEADER=()
 [ -n "$HA_TOKEN" ] && AUTH_HEADER=(-H "Authorization: Bearer $HA_TOKEN")
 
@@ -70,8 +71,8 @@ case "$PHASE" in
   # Phase 1: HA installed and reachable
   check_eq "home-assistant active" "$(systemctl is-active home-assistant 2>/dev/null)" "active"
   check "HA HTTP responds 200"       bash -c 'curl -sfI http://127.0.0.1:8123 | head -1 | grep -q 200'
-  check "config dir exists"          test -f /mnt/dietpi_userdata/homeassistant/configuration.yaml
-  check "onboarding complete"        test -f /mnt/dietpi_userdata/homeassistant/.storage/onboarding
+  check "config dir exists"          test -f ${HA_CONFIG:-/mnt/dietpi_userdata/homeassistant}/configuration.yaml
+  check "onboarding complete"        test -f ${HA_CONFIG:-/mnt/dietpi_userdata/homeassistant}/.storage/onboarding
   # Memory headroom
   FREE_MB=$(free -m | awk '/Mem:/ {print $7}')
   if [ "$FREE_MB" -ge 100 ]; then
@@ -87,9 +88,9 @@ case "$PHASE" in
   # Phase 2: entities exist
   if [ -z "$HA_TOKEN" ]; then
     echo "  SKIP API checks: HA_TOKEN not set (export HA_TOKEN='<long-lived-token>')"
-    check "yaml parses" bash -c 'python3 -c "import yaml; yaml.safe_load(open(\"/mnt/dietpi_userdata/homeassistant/packages/esmart_bridge.yaml\"))"'
+    check "yaml parses" bash -c "python3 -c 'import yaml; yaml.safe_load(open(\"$HA_CONFIG/packages/esmart_bridge.yaml\"))'"
   else
-    check "yaml parses" bash -c 'python3 -c "import yaml; yaml.safe_load(open(\"/mnt/dietpi_userdata/homeassistant/packages/esmart_bridge.yaml\"))"'
+    check "yaml parses" bash -c "python3 -c 'import yaml; yaml.safe_load(open(\"$HA_CONFIG/packages/esmart_bridge.yaml\"))'"
     SW=$(curl -s "${AUTH_HEADER[@]}" "$HA_URL/api/states" 2>/dev/null | python3 -c "
 import json,sys
 try:
@@ -115,10 +116,10 @@ except: print(-1)
 
 3)
   # Phase 3: Google Home (optional)
-  if [ ! -f /mnt/dietpi_userdata/homeassistant/google_assistant.yaml ]; then
+  if [ ! -f ${HA_CONFIG:-/mnt/dietpi_userdata/homeassistant}/google_assistant.yaml ]; then
     echo "  PASS: Google Home not configured (phase skipped cleanly)"
   else
-    check "google_assistant yaml parses" bash -c 'python3 -c "import yaml; yaml.safe_load(open(\"/mnt/dietpi_userdata/homeassistant/google_assistant.yaml\"))"'
+    check "google_assistant yaml parses" bash -c 'python3 -c "import yaml; yaml.safe_load(open(\"${HA_CONFIG:-/mnt/dietpi_userdata/homeassistant}/google_assistant.yaml\"))"'
   fi
   ;;
 

@@ -26,7 +26,7 @@ case "$PHASE" in
 
 2)
   echo "  Removing HA package file..."
-  sudo rm -f /mnt/dietpi_userdata/homeassistant/packages/esmart_bridge.yaml
+  sudo rm -f "${HA_CONFIG:-/mnt/dietpi_userdata/homeassistant}/packages/esmart_bridge.yaml"
   sudo systemctl restart home-assistant
   sleep 10
   echo "  HA restarted without esmart_bridge.yaml."
@@ -34,10 +34,10 @@ case "$PHASE" in
 
 3)
   echo "  Removing Google Assistant config (if present)..."
-  sudo rm -f /mnt/dietpi_userdata/homeassistant/google_assistant.yaml
-  sudo python3 - <<'PY'
+  sudo rm -f "${HA_CONFIG:-/mnt/dietpi_userdata/homeassistant}/google_assistant.yaml"
+  sudo -E python3 - <<'PY'
 import re
-p = '/mnt/dietpi_userdata/homeassistant/configuration.yaml'
+p = os.environ.get('HA_CONFIG', '/mnt/dietpi_userdata/homeassistant') + '/configuration.yaml'
 try:
   txt = open(p).read()
 except FileNotFoundError:

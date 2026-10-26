@@ -102,7 +102,7 @@ for PHASE in {0..6}; do
         log "Please complete the onboarding in your browser, then continue..."
         
         # Wait for onboarding to complete
-        until [ -f /mnt/dietpi_userdata/homeassistant/.storage/onboarding ]; do
+        until [ -f "${HA_CONFIG:-/mnt/dietpi_userdata/homeassistant}/.storage/onboarding" ]; do
           echo "WAITING: complete onboarding at http://192.168.1.126:8123"
           sleep 30
         done
@@ -111,7 +111,7 @@ for PHASE in {0..6}; do
     2)
         # Phase 2: Bridge eSMART into HA
         log "Setting up eSMART bridge package in Home Assistant..."
-        HA_CONFIG="/mnt/dietpi_userdata/homeassistant"
+        HA_CONFIG="${HA_CONFIG:-$(ls -d /opt/homeassistant /mnt/dietpi_userdata/homeassistant 2>/dev/null | head -1)}"
         mkdir -p "$HA_CONFIG/packages"
         
         # Copy the package file
@@ -151,7 +151,7 @@ YAML
     3)
         # Phase 3: Google Home (optional)
         log "Checking for Google Home integration..."
-        HA_CONFIG="/mnt/dietpi_userdata/homeassistant"
+        HA_CONFIG="${HA_CONFIG:-$(ls -d /opt/homeassistant /mnt/dietpi_userdata/homeassistant 2>/dev/null | head -1)}"
         
         if [ -f "$HA_CONFIG/google_assistant.yaml" ]; then
             log "Google Assistant already configured, skipping setup."
